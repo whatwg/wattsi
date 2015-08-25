@@ -1,0 +1,21 @@
+[
+  {
+    "object": { },
+    "array": [ ],
+    "number": 0,
+    "string": "",
+    "true": true,
+    "false": false,
+    "null": null
+  },
+  {
+    "object": { "foo": "bar" },
+    "array": [ "foo", "bar" ],
+    "number": 900,
+    "string": "foo"
+  },
+  {
+    "string": "a\"\\\/\b\f\n\r\t\u263A\uD834\uDD1Eb",
+    "number": 9.0e+02
+  }
+]

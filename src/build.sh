@@ -1,0 +1,14 @@
+MAIN="wattsi"
+SRC=""
+#MODE="DEBUG"
+#MODE="FAST-DEBUG"
+#MODE="FAST"
+#MODE="VALGRIND-DEBUG"
+#MODE="PROFILE"
+#MODE="MEMCHECK"
+MODE="RELEASE"
+
+PATHS="-Fu${SRC}html -Fi${SRC}html -Fi${SRC}html/entities.inc"
+DEFINES="-dUSEROPES -dLINES -dPARSEERROR"
+
+. ${SRC}lib/compile.sh

@@ -1,0 +1,91 @@
+--- /home/ianh/bin/fpc/trunk/src/rtl/inc/heaptrc.pp	2014-03-16 05:03:46.447613705 +0000
++++ heaptrc.pas	2014-04-26 21:36:12.286844146 +0000
+@@ -1,6 +1,13 @@
++{$MODE OBJFPC} { -*- text -*- }
++{$INCLUDE settings.inc}
++{$NOTES OFF} {$HINTS OFF} {$WARNINGS OFF}
++{$INLINE OFF}
++{$WRITEABLECONST ON}
++{$GOTO ON}
++{$MODESWITCH CVAR+}
+ {
+     This file is part of the Free Pascal run time library.
+     Copyright (c) 1999-2000 by the Free Pascal development team.
+ 
+     Heap tracer
+ 
+@@ -19,12 +25,16 @@
+ 
+ {$ifdef FPC_HEAPTRC_EXTRA}
+   {$define EXTRA}
+   {$inline off}
+ {$endif FPC_HEAPTRC_EXTRA}
+ 
++{$IFDEF EXTRA}
++{$WARNING EXTRA HEAP DEBUGGING INFORMATION ENABLED - MEMORY USAGE WILL SKYROCKET}
++{$ENDIF}
++
+ {$checkpointer off}
+ {$TYPEDADDRESS on}
+ 
+ {$if defined(win32) or defined(wince)}
+   {$define windows}
+ {$endif}
+@@ -52,15 +62,15 @@
+ procedure CheckPointer(p : pointer);
+ 
+ const
+   { tracing level
+     splitted in two if memory is released !! }
+ {$ifdef EXTRA}
+-  tracesize = 16;
++  tracesize = 64;
+ {$else EXTRA}
+-  tracesize = 8;
++  tracesize = 32; // default 8
+ {$endif EXTRA}
+   { install heaptrc memorymanager }
+   useheaptrace : boolean=true;
+   { less checking }
+   quicktrace : boolean=true;
+   { calls halt() on error by default !! }
+@@ -1140,12 +1150,14 @@
+   loc_info:=@heap_info;
+   if useownfile then
+     ptext:=@ownfile
+   else
+     ptext:=textoutput;
+   pp:=loc_info^.heap_mem_root;
++if (loc_info^.getmem_cnt-loc_info^.freemem_cnt > 0) then
++begin
+   Writeln(ptext^,'Heap dump by heaptrc unit');
+   Writeln(ptext^,loc_info^.getmem_cnt, ' memory blocks allocated : ',
+     loc_info^.getmem_size,'/',loc_info^.getmem8_size);
+   Writeln(ptext^,loc_info^.freemem_cnt,' memory blocks freed     : ',
+     loc_info^.freemem_size,'/',loc_info^.freemem8_size);
+   Writeln(ptext^,loc_info^.getmem_cnt-loc_info^.freemem_cnt,
+@@ -1153,19 +1165,23 @@
+   status:=SysGetFPCHeapStatus;
+   Write(ptext^,'True heap size : ',status.CurrHeapSize);
+   if EntryMemUsed > 0 then
+     Writeln(ptext^,' (',EntryMemUsed,' used in System startup)')
+   else
+     Writeln(ptext^);
+-  Writeln(ptext^,'True free heap : ',status.CurrHeapFree);
++end;
+   ExpectedHeapFree:=status.CurrHeapSize
+     -(loc_info^.getmem8_size-loc_info^.freemem8_size)
+     -(loc_info^.getmem_cnt-loc_info^.freemem_cnt)*(sizeof(theap_mem_info)+extra_info_size)
+     -EntryMemUsed;
++if (ExpectedHeapFree<>status.CurrHeapFree) then
++begin
++  Writeln(ptext^,'True free heap : ',status.CurrHeapFree);
+   If ExpectedHeapFree<>status.CurrHeapFree then
+     Writeln(ptext^,'Should be : ',ExpectedHeapFree);
++end;
+   i:=loc_info^.getmem_cnt-loc_info^.freemem_cnt;
+   while pp<>nil do
+    begin
+      if i<0 then
+        begin
+           Writeln(ptext^,'Error in heap memory list');
