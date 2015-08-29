@@ -2,6 +2,17 @@
 
 Wattsi is a build tool for creating the [HTML Standard](http://html.spec.whatwg.org/multipage/) from its [source](https://github.com/whatwg/html). It works in concert with [other scripts](https://github.com/whatwg/html-build).
 
+## Features
+
+Currently:
+ * Number the sections
+ * Create Table of Contents
+ * Cross-reference `<span>` and `<code>` to `<dfn>`
+ * Create small TOC
+ * Cross-reference back (`<dfn>` menu)
+ * Strip out unused references
+ * Spec splitting
+
 ## Building
 
 Wattsi is written in [Free Pascal](http://www.freepascal.org/), and uses features from the latest release candidate versions. You'll need to install the 3.0.0-rc1 FreePascal compiler from ftp://freepascal.stack.nl/pub/fpc/beta/3.0.0-rc1/ to build it. With that installed, you should be able to run `./build.sh` to create the wattsi executable and supporting shared libraries.
