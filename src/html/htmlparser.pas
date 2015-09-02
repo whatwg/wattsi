@@ -333,7 +333,7 @@ function PrefixMatch(const Value, Candidate: UTF8String): Boolean;
 type
    TBlob = Pointer;
    PBlobArray = ^TBlobArray;
-   TBlobArray = array[0..MaxInt] of TBlob;
+   TBlobArray = array[0..0] of TBlob;
 var
    Steps, EndOfBlobs: Cardinal;
    Index: Cardinal;

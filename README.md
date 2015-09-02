@@ -21,8 +21,6 @@ We hope to in the future provide precompiled wattsi binaries, built via continuo
 
 ## Troubleshooting
 
-The Wattsi code is not 32-bit safe (or 16-bit safe!). It needs a 64-bit environment. This could probably be fixed, but likely isn't worth the hassle.
-
-If you're building on Mac OSX, the compiler there seems to sometimes default to 32 bit. So, make sure to specify the 64-bit compiler by adding `-Px86_64` to the `DEFINES` line in the [`src/build.sh`](https://github.com/whatwg/wattsi/blob/master/src/build.sh) file, so that it looks like this:
+The Wattsi code is not guaranteed to 32-bit safe (or 16-bit safe!). If you're building on Mac OS X, the FreePascal compiler there defaults to building 32-bit binaries. But you can choose to build a 64-bit `wattsi` binary by adding `-Px86_64` to the `DEFINES` line in the [`src/build.sh`](https://github.com/whatwg/wattsi/blob/master/src/build.sh) file, so that it looks like this:
 
     DEFINES="-dUSEROPES -dLINES -dPARSEERROR -Px86_64"
