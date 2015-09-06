@@ -43,6 +43,9 @@ uses
    plasticarrays, exceptions, unicode, ropes, wires, canonicalstrings,
    dom, webdom, htmlparser, json;
 
+var
+   Quiet: Boolean = false;
+
 type
    TAllVariants = (vHTML, vDEV, vSplit);
    TVariants = vHTML..vDEV;
@@ -1960,6 +1963,12 @@ begin
    {$ENDIF}
 end;
 
+procedure Inform(Message: UTF8String);
+begin
+   if (not Quiet) then
+      Writeln(Message);
+end;
+
 procedure PreProcessCanIUseData(const CanIUseJSONFilename: AnsiString);
 var
    CanIUseData, Agent, Version, FeatureData: TJSON;
@@ -1972,10 +1981,10 @@ var
    States: set of TImplState;
    NewState: TImplGoodState;
 begin
-   Writeln('Parsing caniuse.com data...');
+   Inform('Parsing caniuse.com data...');
    CanIUseData := ParseJSON(ReadTextFile(CanIUseJSONFilename));
    try
-      Writeln('Processing caniuse.com data...');
+      Inform('Processing caniuse.com data...');
       for BrowserIndex := Low(Browsers) to High(Browsers) do
       begin
          Browsers[BrowserIndex].Code := '';
@@ -2103,7 +2112,7 @@ var
    Bug: TBug;
    Feature: TFeature;
 begin
-   Writeln('Parsing bugs data...');
+   Inform('Parsing bugs data...');
    Assign(BugsFile, BugsFilename);
    Reset(BugsFile);
    Readln(BugsFile); // skip header
@@ -2184,6 +2193,7 @@ function Main(): Boolean;
 const
    OtherVariants = [Low(TVariants)..High(TVariants)] - [Low(TVariants)];
 var
+   ParamOffset: Integer = 0;
    Source: TFileData;
    OutputDirectory: AnsiString;
    Parser: THTMLParser;
@@ -2194,13 +2204,19 @@ var
 begin
    Result := False;
    if (ParamCount() <> 4) then
-   begin
-      Writeln('wattsi: invalid arguments');
-      Writeln('syntax:');
-      Writeln('  wattsi <source-file> <output-directory> <caniuse.json> <bugs.csv>');
-      exit;
-   end;
-   OutputDirectory := ParamStr(2);
+      if ((ParamCount() = 5) and (ParamStr(1) = '--quiet')) then
+      begin
+         Quiet := true;
+         ParamOffset := 1;
+      end
+      else
+      begin
+         Writeln('wattsi: invalid arguments');
+         Writeln('syntax:');
+         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
+         exit;
+      end;
+   OutputDirectory := ParamStr(2 + ParamOffset);
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -2210,8 +2226,8 @@ begin
    end;
    Features := TFeatureMap.Create(@UTF8StringHash32);
    try
-      PreProcessCanIUseData(ParamStr(3));
-      PreProcessBugsData(ParamStr(4));
+      PreProcessCanIUseData(ParamStr(3 + ParamOffset));
+      PreProcessBugsData(ParamStr(4 + ParamOffset));
       {$IFDEF VERBOSE_PREPROCESSORS}
          if (Assigned(Features)) then
             for ID in Features do
@@ -2230,9 +2246,9 @@ begin
       eList := Intern('list');
       eChapter := Intern('chapter');
       RegisterHTMLElement('ref', eRef, THTMLElement, 0);
-      Writeln('Parsing...');
+      Inform('Parsing...');
       {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-      Source := ReadFile(ParamStr(1));
+      Source := ReadFile(ParamStr(1 + ParamOffset));
       try
          Parser := THTMLParser.Create();
          Parser.RegisterProperietaryVoidElements([eRef]);
@@ -2266,7 +2282,7 @@ begin
                // gen...
                for Variant in TVariants do
                begin
-                  Writeln('Generating ', Variant, ' variant...');
+                  Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
                   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
                   ProcessDocument(Documents[Variant], Variant, BigTOC); // $R-
                   {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
