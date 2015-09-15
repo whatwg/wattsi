@@ -754,28 +754,6 @@ var
             if (not References.Has(LastSeenReferenceName)) then
                Result := False;
          end
-         else
-         if (Element.IsIdentity(nsHTML, eHTML)) then
-         begin
-            if (Element.HasAttribute('data-revision')) then
-            begin
-               try
-                  Revision := ReadTextFile('revision.dat');
-                  // XXX strip trailing LF is there really always is one
-                  if ((Length(Revision) = 0) or (Revision[1] <> 'r')) then
-                     raise Exception.Create('file is empty or does not give revision');
-                  StringStore.Push(Revision);
-                  Scratch := Default(Rope);
-                  Scratch.Append('$Revision: ');
-                  Scratch.Append(@Revision[2], Length(Revision)-1); // $R-
-                  Scratch.Append(' $');
-                  Element.SetAttributeDestructively('data-revision', Scratch);
-               except
-                  on E: Exception do
-                     Fail('used data-revision='' without valid revision.dat: ' + E.Message);
-               end;
-            end;
-         end;
       end
       else
       if (Node is TComment) then
