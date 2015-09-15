@@ -60,8 +60,6 @@ const
    kUndefinedAttribute = 'undefined';
    kSplitFilenameAttribute = 'split-filename';
    kSplitFilenameTargetAttribute = 'split-filename-target';
-   kOldImgPrefix = 'images/';
-   kNewImgPrefix = 'https://images.whatwg.org/';
    kNonNormative = 'This section is non-normative.';
    kEllipsis = #$22F0;
    Months: array[1..12] of UTF8String = ('January', 'February', 'March', 'April',
@@ -757,33 +755,6 @@ var
                Result := False;
          end
          else
-         if (Element.IsIdentity(nsHTML, eImg)) then
-         begin
-            if (Element.HasAttribute('src')) then
-            begin
-               ExtractedData := Element.GetAttribute('src');
-               ImageSrc := Default(Rope);
-               ImageSrc.AppendDestructively(ExtractedData);
-               Index := 1;
-               Enumerator := ImageSrc.GetEnumerator();
-               Matching := True;
-               while (Matching and Enumerator.MoveNext() and (Index <= Length(kOldImgPrefix))) do
-               begin
-                  Matching := Enumerator.Current = Ord(kOldImgPrefix[Index]);
-                  Inc(Index);
-               end;
-               if (Matching and (Index > Length(kOldImgPrefix))) then
-               begin
-                  ExtractedData := ImageSrc.ExtractToEnd(Enumerator.GetPointer());
-                  Scratch := Default(Rope);
-                  Scratch.Append(@kNewImgPrefix[1], Length(kNewImgPrefix));
-                  Scratch.AppendDestructively(ExtractedData);
-                  Element.SetAttributeDestructively('src', Scratch);
-               end;
-               Enumerator.Free();
-            end;
-         end
-         else
          if (Element.IsIdentity(nsHTML, eHTML)) then
          begin
             if (Element.HasAttribute('data-revision')) then
@@ -1009,14 +980,14 @@ var
                begin
                   if (Feature.FirstGoodVersion[BrowserIndex].Version <> '') then
                      case (Feature.FirstGoodVersion[BrowserIndex].State) of
-                        sYes: 
+                        sYes:
                            begin
                               P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' yes'], Document,
                                               [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
                                                T(' '),
                                                E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
                            end;
-                        sAlmost: 
+                        sAlmost:
                            begin
                               P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' partial'], Document,
                                               [E(eSpan, [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
@@ -2076,7 +2047,7 @@ begin
                        'd': Include(States, sDisabled);
                        '#', '0'..'9': Include(States, sNotes);
                      end;
-               if ((States * [sYes, sAlmost, sNo, sPrefix, sDisabled] <> []) and 
+               if ((States * [sYes, sAlmost, sNo, sPrefix, sDisabled] <> []) and
                    (not (sUnknown in States))) then
                begin
                   if (States * [sYes, sAlmost, sNo, sPrefix, sDisabled] = [sYes]) then
@@ -2128,7 +2099,7 @@ begin
       while ((StringIndex < Length(S)) and (Field <= High(Fields))) do
       begin
          case (S[StringIndex]) of
-            '"': 
+            '"':
                begin
                   case (Mode) of
                      pmQuoted:
