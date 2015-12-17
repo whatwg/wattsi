@@ -1164,6 +1164,7 @@ begin
    if (Errors > 0) then
    begin
       Writeln('Error count: ', Errors);
+      ExitCode := 1;
       // raise EAbort.Create(IntToStr(Errors) + ' errors found.');
    end;
 end;
