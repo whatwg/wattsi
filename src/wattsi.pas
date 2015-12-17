@@ -31,7 +31,7 @@ DFN
 
 <ref> should have a popup of the <dd> when hovered
 
-use <a [data-x]> instead of <span [data-x]>
+use <a [lt]> instead of <span [data-x]>
 
  ****************************)
 
@@ -60,6 +60,8 @@ const
    kUndefinedAttribute = 'undefined';
    kSplitFilenameAttribute = 'split-filename';
    kSplitFilenameTargetAttribute = 'split-filename-target';
+   kLTAttribute = 'lt';
+   kHrefAttribute = 'href';
    kNonNormative = 'This section is non-normative.';
    kEllipsis = #$22F0;
    Months: array[1..12] of UTF8String = ('January', 'February', 'March', 'April',
@@ -644,6 +646,8 @@ var
          else
          if (Element.IsIdentity(nsHTML, eDFN)) then
          begin
+            if (Element.HasAttribute(kLTAttribute)) then
+               Fail('<dfn> with lt="" found, use data-x="" instead; dfn is ' + Describe(Element));
             CrossReferenceName := GetTopicIdentifier(Element);
             if (Assigned(InDFN)) then
                Fail('Nested <dfn>: ' + Describe(Element));
@@ -681,15 +685,24 @@ var
          else
          if (Element.IsIdentity(nsHTML, eCode) and (not Assigned(InDFN))) then
          begin
+            if (Element.HasAttribute(kLTAttribute)) then
+               Fail('<code> with lt="" found, use data-x="" instead; code is ' + Describe(Element));
             SaveCrossReference(Element);
          end
          else
          if (Element.IsIdentity(nsHTML, eSpan)) then
          begin
+            if (Element.HasAttribute(kLTAttribute)) then
+               Fail('<span> with lt="" found, use data-x="" instead; span is ' + Describe(Element));
             if (Assigned(InDFN)) then
                Fail('<span> inside <dfn>; span is ' + Describe(Element))
             else
                SaveCrossReference(Element);
+         end
+         else
+         if (Element.isIdentity(nsHTML, eA) and (not Element.HasAttribute(kHrefAttribute))) then
+         begin
+            Fail('<a> without href found: ' + Describe(Element));
          end
          else
          if (Element.IsIdentity(nsHTML, eI) and (not Assigned(InDFN)) and (Element.HasAttribute(kCrossRefAttribute))) then
