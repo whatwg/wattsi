@@ -1187,7 +1187,9 @@ begin
    if (Errors > 0) then
    begin
       Writeln('Error count: ', Errors);
-      ExitCode := 1;
+      if (ExitCode = 0) then
+         // only set ExitCode to 1 if some other part of the code has not already set to other value
+         ExitCode := 1;
       // raise EAbort.Create(IntToStr(Errors) + ' errors found.');
    end;
 end;
@@ -2325,6 +2327,5 @@ begin
 end;
 
 begin
-   if (not Main()) then
-      Halt(1);
+   Main();
 end.

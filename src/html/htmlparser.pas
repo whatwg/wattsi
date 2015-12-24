@@ -35,6 +35,10 @@ uses
 // When optimising for a specific data set
 //{$DEFINE INSTRUMENTING}
 
+const
+   // per sysexits.h EX_DATAERR signals "the input data was incorrect"; e.g. a parse error
+   ecDataError: Integer = 65;
+
 type
 {$IFDEF USEROPES}
    TParserString = Rope;
@@ -1190,6 +1194,7 @@ procedure THTMLParser.ParseError(Message: UTF8String; const Count: Cardinal = 1)
 var
    Index: Cardinal;
 begin
+   exitcode := ecDataError;
    Assert(Count >= 1);
    {$IFDEF LINES}
    Message := '(' + IntToStr(FInputStream.Line) + ',' + IntToStr(FInputStream.Column) + ') ' + Message;
