@@ -167,6 +167,16 @@ var
       Inc(Errors);
    end;
 
+   procedure Warn(Message: UTF8String);
+   var
+      Index: Cardinal;
+   begin
+      for Index := 1 to Length(Message) do // $R-
+         if (Message[Index] = #$0A) then
+            Message[Index] := ' ';
+      Writeln('Warning: ', Message);
+   end;
+
    function Describe(const Element: TElement): UTF8String;
    var
       HeadingContents: UTF8String;
@@ -913,7 +923,7 @@ var
             begin
                if ((Ancestor = BigTOC) or (Ancestor = SmallTOC)) then
                begin
-                  Fail('Found ID ' + ID + ' in a table of contents for annotation that uses URLs:');
+                  Warn('Found ID ' + ID + ' in a table of contents for annotation that uses URLs:');
                   for Bug in Feature.Bugs do
                      Writeln('   ', Bug.URL);
                   if (Feature.CanIUseCode <> '') then
@@ -999,7 +1009,7 @@ var
          end
          else
          begin
-            Fail('Could not find ID ' + ID + ' for annotation that uses URLs:');
+            Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
             for Bug in Feature.Bugs do
                Writeln('   ', Bug.URL);
             if (Feature.CanIUseCode <> '') then
