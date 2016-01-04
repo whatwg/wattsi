@@ -829,7 +829,7 @@ var
             TempElement := E(eSpan, [kCrossRefAttribute, 'fingerprinting vector',
                                      'title', 'There is a potential fingerprinting vector here.',
                                      'class', 'fingerprint'],
-                                    [E(eImg, ['src', 'images/fingerprint.png',
+                                    [E(eImg, ['src', '/images/fingerprint.png',
                                               'alt', '(This is a fingerprinting vector.)',
                                               'width', '46',
                                               'height', '64'])]);
@@ -1634,7 +1634,7 @@ begin
    SectionNames := TStringSet.Create(@UTF8StringHash32);
    SectionNames.Add('index');
    Link := ConstructHTMLElement(eScript);
-   Link.SetAttribute('src', 'link-fixup.js');
+   Link.SetAttribute('src', '/link-fixup.js');
    (Document.DocumentElement.FirstChild as TElement).AppendChild(Link); // XXX really should find head rather than assuming there's no comment before it (or have we stripped comments by now? if we have, then XXX don't bother with all that work to find the body...)
    // find body
    Current := Document;
