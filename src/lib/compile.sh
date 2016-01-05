@@ -3,6 +3,26 @@
 # you can add -dFOO to DEFINES if you like (for any value of FOO)
 # you can set TESTCMD if you want to run a particular command instead of the obvious
 
+# list of numbered fpc (hint/warning) messages to suppress
+IGNORE_MESSAGES=3018,3123,3124,4035,4045,4055,4079,5024,5025,5036,5055,5057,5058,5059,5071,5092,5093
+# 3018 Warning: Constructor should be public
+# 3123 Hint: "open array" not yet supported inside inline procedure/function
+# 3124 Hint: Inlining disabled
+# 4035 Hint: Mixing signed expressions and longwords gives a 64bit result
+# 4045 Warning: Comparison might be always true due to range of constant and expression
+# 4055 Hint: Conversion between ordinals and pointers is not portable
+# 4079 Hint: Converting the operands to "Int64" before doing the add could prevent overflow errors.
+# 5024 Hint: Parameter "arg1" not used
+# 5025 Note: Local variable "arg1" not used
+# 5036 Warning: Local variable "arg1" does not seem to be initialized
+# 5055 Warning: Symbol "XXX" is not implemented
+# 5057 Hint: Local variable "arg1" does not seem to be initialized
+# 5058 Hint: Variable "arg1" does not seem to be initialized
+# 5059 Warning: Function result variable does not seem to initialized
+# 5071 Note: Private type "arg1.arg2" never used
+# 5092 Hint: Variable "arg1" of a managed type does not seem to be initialized
+# 5093 Warning: function result variable of a managed type does not seem to initialized
+
 # XXX -O4 should have LEVEL4 equivalent
 
 PATHS="-FE${SRC}../bin/ -Fu${SRC}lib -Fi${SRC}lib ${PATHS}"
@@ -127,17 +147,17 @@ else
 
   # RELEASE MODE:
   echo compile: COMPILING - RELEASE MODE
-  fpc ${MAIN}.pas -l- -dRELEASE -dOPT ${DEFINES} -Xs- -XX -B -v0einf -O4 -OWALL -FW${SRC}../bin/opt-feedback ${PATHS} 2>&1 || exit
+  fpc ${MAIN}.pas -l- -dRELEASE -dOPT ${DEFINES} -Xs- -XX -B -v0einfm${IGNORE_MESSAGES} -O4 -OWALL -FW${SRC}../bin/opt-feedback ${PATHS} 2>&1 || exit
   cmp -s ${SRC}../bin/${BINARY} ${SRC}../bin/${BINARY}.last
   until [ $? -eq 0 ]; do
     echo compile: Trying to find optimisation stable point...
     mv ${SRC}../bin/${BINARY} ${SRC}../bin/${BINARY}.last || exit
     mv ${SRC}../bin/opt-feedback ${SRC}../bin/opt-feedback.last || exit
-    fpc ${MAIN}.pas -l- -dRELEASE -dOPT ${DEFINES} -Xs- -XX -B -O4 -OwALL -Fw${SRC}../bin/opt-feedback.last -OWALL -FW${SRC}../bin/opt-feedback ${PATHS} || exit
+    fpc ${MAIN}.pas -l- -dRELEASE -dOPT ${DEFINES} -Xs- -XX -B -O4 -v0einfm${IGNORE_MESSAGES} -OwALL -Fw${SRC}../bin/opt-feedback.last -OWALL -FW${SRC}../bin/opt-feedback ${PATHS} || exit
     cmp -s ${SRC}../bin/${BINARY} ${SRC}../bin/${BINARY}.last
   done
   echo compile: Final build...
-  fpc ${MAIN}.pas -a -l- -dRELEASE -dOPT ${DEFINES} -Xs -XX -B -O4 -v0einf -OwALL -Fw${SRC}../bin/opt-feedback ${PATHS} 2>&1 || exit
+  fpc ${MAIN}.pas -a -l- -dRELEASE -dOPT ${DEFINES} -Xs -XX -B -O4 -v0einfm${IGNORE_MESSAGES} -OwALL -Fw${SRC}../bin/opt-feedback ${PATHS} 2>&1 || exit
   rm -f ${SRC}../bin/*.o ${SRC}../bin/*.ppu ${SRC}../bin/*.last &&
   ls -al ${SRC}../bin/${BINARY} &&
   perl -E 'say ("executable size: " . (-s $ARGV[0]) . " bytes")' ${SRC}../bin/${BINARY} &&
