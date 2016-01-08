@@ -19,8 +19,8 @@ Wattsi is written in [Free Pascal](http://www.freepascal.org/), and uses feature
 
 We hope to in the future provide precompiled wattsi binaries, built via continuous integration, for Wattsi. Or even a web service that allows you to run Wattsi by POSTing to a given URL. If you think you can help out with these tasks, file an issue to get the discussion started!
 
-## Troubleshooting
+## Building a Wattsi binary with 64-bit code
 
-The Wattsi code is not guaranteed to 32-bit safe (or 16-bit safe!). If you're building on Mac OS X, the FreePascal compiler there defaults to building 32-bit binaries. But you can choose to build a 64-bit `wattsi` binary by adding `-Px86_64` to the `DEFINES` line in the [`src/build.sh`](https://github.com/whatwg/wattsi/blob/master/src/build.sh) file, so that it looks like this:
+On Mac OS X (and perhaps on other systems as well), the FreePascal compiler defaults to generating 32-bit code. If for some reason you need to build a `wattsi` binary with 64-bit code, you can do so by adding `-Px86_64` to the `DEFINES` line in the [`src/build.sh`](https://github.com/whatwg/wattsi/blob/master/src/build.sh) file, so that it looks like this:
 
     DEFINES="-dUSEROPES -dLINES -dPARSEERROR -Px86_64"
