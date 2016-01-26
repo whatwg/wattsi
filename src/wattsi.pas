@@ -1861,7 +1861,36 @@ begin
    SectionNames.Free();
 end;
 
-function URLToID(const SpecURL: UTF8String; out ID: UTF8String): Boolean;
+function CanIUseURLToID(const SpecURL: UTF8String; out ID: UTF8String): Boolean;
+var
+   HashIndex: Cardinal;
+begin
+   ID := '';
+   Result := True;
+   if (Pos('https://html.spec.whatwg.org/', SpecURL) = 1) then
+   begin
+      HashIndex := Pos('#', SpecURL); // $R-
+      if (HashIndex > 0) then
+      begin
+         ID := Copy(SpecURL, HashIndex+1, Length(SpecURL)-HashIndex);
+      end
+      else
+         Result := False;
+   end
+   else
+   if (SpecURL = 'http://www.w3.org/TR/MathML/') then
+   begin
+      ID := 'mathml';
+   end
+   else
+      Result := False;
+   {$IFDEF VERBOSE_ID_FINDER}
+      if (not Result) then
+         Writeln('Could not find ID in: ', SpecURL);
+   {$ENDIF}
+end;
+
+function BugzillaURLToID(const SpecURL: UTF8String; out ID: UTF8String): Boolean;
 var
    HashIndex: Cardinal;
 begin
@@ -1906,11 +1935,6 @@ begin
    if (SpecURL = 'http://www.w3.org/TR/xhtml1/') then
    begin
       ID := 'parsing-xhtml-documents';
-   end
-   else
-   if (SpecURL = 'http://www.w3.org/TR/MathML/') then
-   begin
-      ID := 'mathml';
    end
    else
    if ((SpecURL = 'http://www.w3.org/TR/websockets/') or
@@ -2022,7 +2046,7 @@ begin
       begin
          FeatureData := CanIUseData['data'][FeatureCode];
          SpecURL := FeatureData['spec'];
-         if (not URLToID(SpecURL, ID)) then
+         if (not CanIUseURLToID(SpecURL, ID)) then
             continue;
          if (Features.Has(ID)) then
             Feature := Features[ID]
@@ -2146,7 +2170,7 @@ begin
          end;
          Inc(StringIndex);
       end;
-      if (not URLToID(Fields[1], ID)) then
+      if (not BugzillaURLToID(Fields[1], ID)) then
          continue;
       if (Features.Has(ID)) then
          Feature := Features[ID]
