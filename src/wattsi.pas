@@ -766,7 +766,11 @@ var
             begin
                LastSeenReferenceName := Copy(LastSeenReferenceName, 5, Length(LastSeenReferenceName) - 4);
                if (not References.Has(LastSeenReferenceName)) then
+               begin
+                  if (Variant <> vDEV) then
+                     Warn('Unused reference: [' + LastSeenReferenceName + ']');
                   Result := False;
+               end
             end
             else
                LastSeenReferenceName := '';
