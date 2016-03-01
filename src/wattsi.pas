@@ -296,7 +296,7 @@ var
       for IndexSource := 1 to Length(Original) do // $R-
       begin
          case Original[IndexSource] of
-            ' ', #$0A, '<', '>':
+            ' ', #$0A, '<', '>', '[', #$5C, ']', '^', '{', '|', '}':
                begin
                   if (not HadSpace) then
                   begin
@@ -305,7 +305,7 @@ var
                      HadSpace := True;
                   end;
                end;
-            '"', '?': ; // skipped silently
+            '"', '?', '`': ; // skipped silently
             'A'..'Z':
                begin
                   Inc(IndexTarget);
