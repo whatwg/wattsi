@@ -29,6 +29,12 @@ PATHS="-FE${SRC}../bin/ -Fu${SRC}lib -Fi${SRC}lib ${PATHS}"
 BINARY=`basename ${MAIN}`
 if [ "${TESTCMD}" = "" ]; then TESTCMD="bin/${BINARY}"; fi
 
+if grep -q ^[0-2][.] <<< $(fpc -iV); then
+  echo "ERROR: incorrect fpc version. 3.0.0+ is required."
+  echo "Installed version: $(fpc -iV)"
+  exit 1
+fi
+
 echo "compile: mode=${MODE} main=${MAIN} testcmd=${TESTCMD} defines=${DEFINES}"
 
 ulimit -v 800000
