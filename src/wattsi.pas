@@ -1557,7 +1557,7 @@ begin
    Close(F);
 end;
 
-function Split(const Document: TDocument; var BigTOC: TElement; const Base: AnsiString): Boolean; // True = success, False = failed
+function Split(const Document: TDocument; var BigTOC: TElement; const Base: AnsiString; var LinkFixupJS: AnsiString): Boolean; // True = success, False = failed
 
    procedure SaveFragmentLinks(const Data: Rope);
    var
@@ -1565,7 +1565,7 @@ function Split(const Document: TDocument; var BigTOC: TElement; const Base: Ansi
       LinkFixup: String;
    begin
       // link-fixup.js
-      LinkFixup := ReadTextFile('html/link-fixup.js').AsString;
+      LinkFixup := ReadTextFile(LinkFixupJS).AsString;
       LinkFixup := StringReplace(LinkFixup, '/* WATTSI_INSERTS_FRAGMENT_LINKS_HERE */', Data.AsString, []);
       Assign(LinkFixupFile, Base + '../link-fixup.js');
       Rewrite(LinkFixupFile);
@@ -1731,6 +1731,8 @@ begin
       FragmentLinks.Append($0022);
       Inc(TargetIndex);
    end;
+   // save link-fixup.js and fragment-links.json
+   SaveFragmentLinks(FragmentLinks);
    for Link in Links do
    begin
       if (Link.HasAttribute('href')) then
@@ -1773,8 +1775,6 @@ begin
          end;
       end;
    end;
-   // save link-fixup.js and fragment-links.json
-   SaveFragmentLinks(FragmentLinks);
    // save table of contents section
    SectionDoc := Document.CloneNode(True);
    SectionDoc.DocumentElement.SetAttribute('class', 'split');
@@ -2207,7 +2207,9 @@ const
    OtherVariants = [Low(TVariants)..High(TVariants)] - [Low(TVariants)];
 var
    ParamOffset: Integer = 0;
+   SourceFile: AnsiString;
    Source: TFileData;
+   LinkFixupJS: AnsiString;
    OutputDirectory: AnsiString;
    Parser: THTMLParser;
    BigTOC: TElement;
@@ -2229,7 +2231,14 @@ begin
          Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
          exit;
       end;
+   SourceFile := ParamStr(1 + ParamOffset);
    OutputDirectory := ParamStr(2 + ParamOffset);
+   LinkFixupJS := ExtractFilePath(SourceFile) + 'link-fixup.js';
+   if (not FileExists(LinkFixupJS)) then
+   begin
+      Writeln(LinkFixupJS + ' file not found.');
+      exit;
+   end;
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -2261,7 +2270,7 @@ begin
       RegisterHTMLElement('ref', eRef, THTMLElement, 0);
       Inform('Parsing...');
       {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-      Source := ReadFile(ParamStr(1 + ParamOffset));
+      Source := ReadFile(SourceFile);
       try
          Parser := THTMLParser.Create();
          Parser.RegisterProperietaryVoidElements([eRef]);
@@ -2311,7 +2320,7 @@ begin
                   {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
                   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
                   MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
-                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
+                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/', LinkFixupJS)) then
                      raise EAbort.Create('Could not split specification');
                   {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
                end;
