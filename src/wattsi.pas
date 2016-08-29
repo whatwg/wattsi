@@ -1557,27 +1557,28 @@ begin
    Close(F);
 end;
 
-function Split(const Document: TDocument; var BigTOC: TElement; const Base: AnsiString): Boolean; // True = success, False = failed
+function Split(const Document: TDocument; var BigTOC: TElement; const Base: AnsiString; var LinkFixupJS: AnsiString): Boolean; // True = success, False = failed
 
    procedure SaveFragmentLinks(const Data: Rope);
    var
-      F: Text;
+      LinkFixupFile, FragmentLinksFile: Text;
+      LinkFixup: String;
    begin
-      Assign(F, Base + 'fragment-links.js');
-      Rewrite(F);
-      Write(F, 'var fragment_links = {');
-      Write(F, Data.AsString);
-      Write(F, '};');
-      Write(F, 'var fragid = window.location.hash.substr(1);');
-      Write(F, 'if ((!fragid) || !(fragid in fragment_links)) {'); // handle section-foo.html links from the old old multipage version, and broken foo.html from the new version
-      Write(F,   'var m = window.location.pathname.match(/\/(?:section-)?([\w\-]+)\.html/);');
-      Write(F,   'if (m) fragid = m[1];');
-      Write(F, '}');
-      Write(F, 'var page = fragment_links[fragid];');
-      Write(F, 'if (page) {');
-      Write(F,   'window.location.replace(page+''.html#''+fragid);');
-      Writeln(F, '}');
-      Close(F);
+      // link-fixup.js
+      LinkFixup := ReadTextFile(LinkFixupJS).AsString;
+      LinkFixup := StringReplace(LinkFixup, '/* WATTSI_INSERTS_FRAGMENT_LINKS_HERE */', Data.AsString, []);
+      Assign(LinkFixupFile, Base + '../link-fixup.js');
+      Rewrite(LinkFixupFile);
+      Write(LinkFixupFile, LinkFixup);
+      Close(LinkFixupFile);
+
+      // fragment-links.json
+      Assign(FragmentLinksFile, Base + 'fragment-links.json');
+      Rewrite(FragmentLinksFile);
+      Write(FragmentLinksFile, '{');
+      Write(FragmentLinksFile, Data.AsString);
+      Write(FragmentLinksFile, '}');
+      Close(FragmentLinksFile);
    end;
 
    procedure Fail(const Message: UTF8String);
@@ -1625,10 +1626,11 @@ const
 var
    SectionDoc: TDocument;
    SectionName, ID: UTF8String;
-   Body, Sections, CurrentSection, Link, LinkHome, Target, TargetHome, NewTOC: TElement;
+   FirstChild, Body, Sections, CurrentSection, Link, LinkHome, Target, TargetHome, NewTOC: TElement;
    Next, Current: TNode;
    Adjust: Boolean;
    Targets: TElementMap;
+   TargetIndex: Integer;
    Links: specialize PlasticArray <TElement, TElementUtils>;
    Scratch, FragmentLinks: Rope;
    ExtractedData: CutRope;
@@ -1641,7 +1643,9 @@ begin
    SectionNames.Add('index');
    Link := ConstructHTMLElement(eScript);
    Link.SetAttribute('src', '/link-fixup.js');
-   (Document.DocumentElement.FirstChild as TElement).AppendChild(Link); // XXX really should find head rather than assuming there's no comment before it (or have we stripped comments by now? if we have, then XXX don't bother with all that work to find the body...)
+   Link.SetAttribute('defer', '');
+   FirstChild := Document.DocumentElement.FirstChild as TElement;
+   Document.DocumentElement.InsertBefore(Link, FirstChild);
    // find body
    Current := Document;
    repeat
@@ -1701,9 +1705,15 @@ begin
    end;
    // update all the hyperlinks
    FragmentLinks := Default(Rope);
+   TargetIndex := 0;
    for ID in Targets do
    begin
       Assert(Length(ID) > 0);
+      // emit "," only if ID is not first one to make FragmentLinks JSON compatible.  
+      if (TargetIndex > 0) then
+      begin
+         FragmentLinks.Append($002C);
+      end;
       FragmentLinks.Append($0022);
       FragmentLinks.Append(@ID[1], Length(ID)); // $R-
       FragmentLinks.Append($0022);
@@ -1719,8 +1729,10 @@ begin
       else
          FragmentLinks.AppendDestructively(ExtractedData);
       FragmentLinks.Append($0022);
-      FragmentLinks.Append($002C);
+      Inc(TargetIndex);
    end;
+   // save link-fixup.js and fragment-links.json
+   SaveFragmentLinks(FragmentLinks);
    for Link in Links do
    begin
       if (Link.HasAttribute('href')) then
@@ -1763,8 +1775,6 @@ begin
          end;
       end;
    end;
-   // save fragment-links.js
-   SaveFragmentLinks(FragmentLinks);
    // save table of contents section
    SectionDoc := Document.CloneNode(True);
    SectionDoc.DocumentElement.SetAttribute('class', 'split');
@@ -2197,7 +2207,9 @@ const
    OtherVariants = [Low(TVariants)..High(TVariants)] - [Low(TVariants)];
 var
    ParamOffset: Integer = 0;
+   SourceFile: AnsiString;
    Source: TFileData;
+   LinkFixupJS: AnsiString;
    OutputDirectory: AnsiString;
    Parser: THTMLParser;
    BigTOC: TElement;
@@ -2206,8 +2218,8 @@ var
    Variant: TAllVariants;
 begin
    Result := False;
-   if (ParamCount() <> 4) then
-      if ((ParamCount() = 5) and (ParamStr(1) = '--quiet')) then
+   if (ParamCount() <> 5) then
+      if ((ParamCount() = 6) and (ParamStr(1) = '--quiet')) then
       begin
          Quiet := true;
          ParamOffset := 1;
@@ -2216,10 +2228,17 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
+         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv> <link-fixup.js>');
          exit;
       end;
+   SourceFile := ParamStr(1 + ParamOffset);
    OutputDirectory := ParamStr(2 + ParamOffset);
+   LinkFixupJS := ParamStr(5 + ParamOffset);;
+   if (not FileExists(LinkFixupJS)) then
+   begin
+      Writeln(LinkFixupJS + ' file not found.');
+      exit;
+   end;
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -2251,7 +2270,7 @@ begin
       RegisterHTMLElement('ref', eRef, THTMLElement, 0);
       Inform('Parsing...');
       {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-      Source := ReadFile(ParamStr(1 + ParamOffset));
+      Source := ReadFile(SourceFile);
       try
          Parser := THTMLParser.Create();
          Parser.RegisterProperietaryVoidElements([eRef]);
@@ -2301,7 +2320,7 @@ begin
                   {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
                   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
                   MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
-                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
+                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/', LinkFixupJS)) then
                      raise EAbort.Create('Could not split specification');
                   {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
                end;
