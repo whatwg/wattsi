@@ -2218,8 +2218,8 @@ var
    Variant: TAllVariants;
 begin
    Result := False;
-   if (ParamCount() <> 4) then
-      if ((ParamCount() = 5) and (ParamStr(1) = '--quiet')) then
+   if (ParamCount() <> 5) then
+      if ((ParamCount() = 6) and (ParamStr(1) = '--quiet')) then
       begin
          Quiet := true;
          ParamOffset := 1;
@@ -2228,12 +2228,12 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
+         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv> <link-fixup.js>');
          exit;
       end;
    SourceFile := ParamStr(1 + ParamOffset);
    OutputDirectory := ParamStr(2 + ParamOffset);
-   LinkFixupJS := ExtractFilePath(SourceFile) + 'link-fixup.js';
+   LinkFixupJS := ParamStr(5 + ParamOffset);;
    if (not FileExists(LinkFixupJS)) then
    begin
       Writeln(LinkFixupJS + ' file not found.');
