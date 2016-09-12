@@ -1567,7 +1567,7 @@ function Split(const Document: TDocument; var BigTOC: TElement; const Base: Ansi
       // link-fixup.js
       LinkFixup := ReadTextFile(LinkFixupJS).AsString;
       LinkFixup := StringReplace(LinkFixup, '/* WATTSI_INSERTS_FRAGMENT_LINKS_HERE */', Data.AsString, []);
-      Assign(LinkFixupFile, Base + '../link-fixup.js');
+      Assign(LinkFixupFile, Base + 'link-fixup.js');
       Rewrite(LinkFixupFile);
       Write(LinkFixupFile, LinkFixup);
       Close(LinkFixupFile);
@@ -1709,7 +1709,7 @@ begin
    for ID in Targets do
    begin
       Assert(Length(ID) > 0);
-      // emit "," only if ID is not first one to make FragmentLinks JSON compatible.  
+      // emit "," only if ID is not first one to make FragmentLinks JSON compatible.
       if (TargetIndex > 0) then
       begin
          FragmentLinks.Append($002C);
