@@ -469,7 +469,7 @@ var
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
-      Element, NewLI, SecondLI, NewLink, NewP, NewI, TempElement: TElement;
+      Element, HeadingSelfLink, NewLI, SecondLI, NewLink, NewP, NewI, TempElement: TElement;
       Scratch, ImageSrc: Rope;
       ExtractedData: CutRope;
       ClassName, Instruction, CrossReferenceName, Revision, ReferenceName: UTF8String;
@@ -495,6 +495,28 @@ var
                if (LastSeenHeadingID = '') then
                   LastSeenHeadingID := 'blank-heading';
                LastSeenHeadingID := EnsureID(Element, LastSeenHeadingID).AsString;
+
+               // Append a self-link to each header
+               if (ClassName <> 'no-num no-toc') then
+               begin
+                  HeadingSelfLink := ConstructHTMLElement(eA);
+                  Scratch := Default(Rope);
+                  Scratch.Append('§');
+                  HeadingSelfLink.AppendChild(TText.CreateDestructively(Scratch));
+
+                  Scratch := Default(Rope);
+                  Scratch.Append('#');
+                  ExtractedData := Element.GetAttribute('id');
+                  Assert(not ExtractedData.IsEmpty);
+                  Scratch.AppendDestructively(ExtractedData); // appending LastSeenHeadingID does not work
+                  HeadingSelfLink.SetAttributeDestructively('href', Scratch);
+
+                  Scratch := Default(Rope);
+                  Scratch.Append(' ');
+                  Element.AppendChild(TText.CreateDestructively(Scratch));
+                  Element.AppendChild(HeadingSelfLink);
+               end;
+
                if (CurrentHeadingRank > LastHeadingRank) then
                begin
                   Inc(LastHeadingRank);
