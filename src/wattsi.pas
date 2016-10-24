@@ -568,7 +568,6 @@ var
                            Scratch.Append($002E);
                         Scratch.Append(IntToStr(CurrentSectionNumber[CurrentHeadingRank]));
                      end;
-                     Scratch.Append($002E);
                      Scratch.Append($0020);
 
                      HeadingSecNo := ConstructHTMLElement(eSpan);
