@@ -500,9 +500,8 @@ var
                if (ClassName <> 'no-num no-toc') then
                begin
                   HeadingSelfLink := ConstructHTMLElement(eA);
-                  Scratch := Default(Rope);
-                  Scratch.Append('§');
-                  HeadingSelfLink.AppendChild(TText.CreateDestructively(Scratch));
+
+                  HeadingSelfLink.SetAttribute('class', 'self-link');
 
                   Scratch := Default(Rope);
                   Scratch.Append('#');
