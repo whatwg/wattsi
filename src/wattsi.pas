@@ -469,7 +469,7 @@ var
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
-      Element, HeadingSelfLink, NewLI, SecondLI, NewLink, NewP, NewI, TempElement: TElement;
+      Element, HeadingSelfLink, HeadingSecno, NewLI, SecondLI, NewLink, NewP, NewI, TempElement: TElement;
       Scratch, ImageSrc: Rope;
       ExtractedData: CutRope;
       ClassName, Instruction, CrossReferenceName, Revision, ReferenceName: UTF8String;
@@ -500,7 +500,6 @@ var
                if (ClassName <> 'no-num no-toc') then
                begin
                   HeadingSelfLink := ConstructHTMLElement(eA);
-
                   HeadingSelfLink.SetAttribute('class', 'self-link');
 
                   Scratch := Default(Rope);
@@ -510,9 +509,6 @@ var
                   Scratch.AppendDestructively(ExtractedData); // appending LastSeenHeadingID does not work
                   HeadingSelfLink.SetAttributeDestructively('href', Scratch);
 
-                  Scratch := Default(Rope);
-                  Scratch.Append(' ');
-                  Element.AppendChild(TText.CreateDestructively(Scratch));
                   Element.AppendChild(HeadingSelfLink);
                end;
 
@@ -560,6 +556,8 @@ var
                Assert(LastHeadingRank = CurrentHeadingRank);
                if (ClassName <> 'no-num no-toc') then
                begin
+                  Element.SetAttribute('class', 'heading');
+
                   if (ClassName <> 'no-num') then
                   begin
                      Inc(CurrentSectionNumber[LastHeadingRank]);
@@ -570,8 +568,14 @@ var
                            Scratch.Append($002E);
                         Scratch.Append(IntToStr(CurrentSectionNumber[CurrentHeadingRank]));
                      end;
+                     Scratch.Append($002E);
                      Scratch.Append($0020);
-                     Element.InsertBefore(TText.CreateDestructively(Scratch), Element.FirstChild);
+
+                     HeadingSecNo := ConstructHTMLElement(eSpan);
+                     HeadingSecno.SetAttribute('class', 'secno');
+                     HeadingSecno.AppendChild(TText.CreateDestructively(Scratch));
+
+                     Element.InsertBefore(HeadingSecno, Element.FirstChild);
                   end;
                   if (Assigned(LastTOCOL) or Assigned(SmallTOC)) then
                   begin
