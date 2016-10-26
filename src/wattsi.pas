@@ -556,8 +556,6 @@ var
                Assert(LastHeadingRank = CurrentHeadingRank);
                if (ClassName <> 'no-num no-toc') then
                begin
-                  Element.SetAttribute('class', 'heading');
-
                   if (ClassName <> 'no-num') then
                   begin
                      Inc(CurrentSectionNumber[LastHeadingRank]);
