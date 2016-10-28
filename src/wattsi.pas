@@ -494,7 +494,8 @@ var
                LastSeenHeadingID := MungeTopicToID(Element.TextContent.AsString);
                if (LastSeenHeadingID = '') then
                   LastSeenHeadingID := 'blank-heading';
-               LastSeenHeadingID := EnsureID(Element, LastSeenHeadingID).AsString;
+               ExtractedData := EnsureID(Element, LastSeenHeadingID);
+               LastSeenHeadingID := ExtractedData.AsString;
 
                // Append a self-link to each header
                if (ClassName <> 'no-num no-toc') then
@@ -504,9 +505,7 @@ var
 
                   Scratch := Default(Rope);
                   Scratch.Append('#');
-                  ExtractedData := Element.GetAttribute('id');
-                  Assert(not ExtractedData.IsEmpty);
-                  Scratch.AppendDestructively(ExtractedData); // appending LastSeenHeadingID does not work
+                  Scratch.AppendDestructively(ExtractedData);
                   HeadingSelfLink.SetAttributeDestructively('href', Scratch);
 
                   Element.AppendChild(HeadingSelfLink);
@@ -637,7 +636,6 @@ var
                         begin
                            SecondLI := NewLI.CloneNode(True);
                            ExtractedData := EnsureID(NewLI, 'toc-' + LastSeenHeadingID);
-                           Assert(not ExtractedData.IsEmpty);
                            Scratch := Default(Rope);
                            Scratch.Append($0023);
                            Scratch.AppendDestructively(ExtractedData);
