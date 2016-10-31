@@ -469,7 +469,7 @@ var
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
-      Element, NewLI, SecondLI, NewLink, NewP, NewI, TempElement: TElement;
+      Element, HeadingSelfLink, NewLI, SecondLI, NewLink, NewP, NewI, TempElement: TElement;
       Scratch, ImageSrc: Rope;
       ExtractedData: CutRope;
       ClassName, Instruction, CrossReferenceName, Revision, ReferenceName: UTF8String;
@@ -494,7 +494,26 @@ var
                LastSeenHeadingID := MungeTopicToID(Element.TextContent.AsString);
                if (LastSeenHeadingID = '') then
                   LastSeenHeadingID := 'blank-heading';
-               LastSeenHeadingID := EnsureID(Element, LastSeenHeadingID).AsString;
+               ExtractedData := EnsureID(Element, LastSeenHeadingID);
+               Assert(not ExtractedData.IsEmpty);
+               LastSeenHeadingID := ExtractedData.AsString;
+
+               // Append a self-link to each header
+               if (ClassName <> 'no-num no-toc') then
+               begin
+                  HeadingSelfLink := ConstructHTMLElement(eA);
+                  HeadingSelfLink.SetAttribute('class', 'self-link');
+
+                  Scratch := Default(Rope);
+                  Scratch.Append('#');
+                  Scratch.AppendDestructively(ExtractedData);
+                  HeadingSelfLink.SetAttributeDestructively('href', Scratch);
+
+                  Element.AppendChild(HeadingSelfLink);
+               end;
+
+               // ExtractedData is no longer valid
+
                if (CurrentHeadingRank > LastHeadingRank) then
                begin
                   Inc(LastHeadingRank);
