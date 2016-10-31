@@ -495,6 +495,7 @@ var
                if (LastSeenHeadingID = '') then
                   LastSeenHeadingID := 'blank-heading';
                ExtractedData := EnsureID(Element, LastSeenHeadingID);
+               Assert(not ExtractedData.IsEmpty);
                LastSeenHeadingID := ExtractedData.AsString;
 
                // Append a self-link to each header
@@ -510,6 +511,8 @@ var
 
                   Element.AppendChild(HeadingSelfLink);
                end;
+
+               // ExtractedData is no longer valid
 
                if (CurrentHeadingRank > LastHeadingRank) then
                begin
@@ -636,6 +639,7 @@ var
                         begin
                            SecondLI := NewLI.CloneNode(True);
                            ExtractedData := EnsureID(NewLI, 'toc-' + LastSeenHeadingID);
+                           Assert(not ExtractedData.IsEmpty);
                            Scratch := Default(Rope);
                            Scratch.Append($0023);
                            Scratch.AppendDestructively(ExtractedData);
