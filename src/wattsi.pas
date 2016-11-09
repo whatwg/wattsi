@@ -1576,21 +1576,12 @@ begin
    Close(F);
 end;
 
-function Split(const Document: TDocument; var BigTOC: TElement; const Base: AnsiString; var LinkFixupJS: AnsiString): Boolean; // True = success, False = failed
+function Split(const Document: TDocument; var BigTOC: TElement; const Base: AnsiString): Boolean; // True = success, False = failed
 
    procedure SaveFragmentLinks(const Data: Rope);
    var
-      LinkFixupFile, FragmentLinksFile: Text;
-      LinkFixup: String;
+      FragmentLinksFile: Text;
    begin
-      // link-fixup.js
-      LinkFixup := ReadTextFile(LinkFixupJS).AsString;
-      LinkFixup := StringReplace(LinkFixup, '/* WATTSI_INSERTS_FRAGMENT_LINKS_HERE */', Data.AsString, []);
-      Assign(LinkFixupFile, Base + 'link-fixup.js');
-      Rewrite(LinkFixupFile);
-      Write(LinkFixupFile, LinkFixup);
-      Close(LinkFixupFile);
-
       // fragment-links.json
       Assign(FragmentLinksFile, Base + 'fragment-links.json');
       Rewrite(FragmentLinksFile);
@@ -1750,7 +1741,7 @@ begin
       FragmentLinks.Append($0022);
       Inc(TargetIndex);
    end;
-   // save link-fixup.js and fragment-links.json
+   // save fragment-links.json
    SaveFragmentLinks(FragmentLinks);
    for Link in Links do
    begin
@@ -2228,7 +2219,6 @@ var
    ParamOffset: Integer = 0;
    SourceFile: AnsiString;
    Source: TFileData;
-   LinkFixupJS: AnsiString;
    OutputDirectory: AnsiString;
    Parser: THTMLParser;
    BigTOC: TElement;
@@ -2237,8 +2227,8 @@ var
    Variant: TAllVariants;
 begin
    Result := False;
-   if (ParamCount() <> 5) then
-      if ((ParamCount() = 6) and (ParamStr(1) = '--quiet')) then
+   if (ParamCount() <> 4) then
+      if ((ParamCount() = 5) and (ParamStr(1) = '--quiet')) then
       begin
          Quiet := true;
          ParamOffset := 1;
@@ -2247,17 +2237,11 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv> <link-fixup.js>');
+         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
          exit;
       end;
    SourceFile := ParamStr(1 + ParamOffset);
    OutputDirectory := ParamStr(2 + ParamOffset);
-   LinkFixupJS := ParamStr(5 + ParamOffset);;
-   if (not FileExists(LinkFixupJS)) then
-   begin
-      Writeln(LinkFixupJS + ' file not found.');
-      exit;
-   end;
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -2339,7 +2323,7 @@ begin
                   {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
                   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
                   MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
-                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/', LinkFixupJS)) then
+                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
                      raise EAbort.Create('Could not split specification');
                   {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
                end;
