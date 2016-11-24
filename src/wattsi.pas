@@ -587,7 +587,7 @@ var
                      NewLink.AppendChild(CandidateChild);
                      CandidateChild := TempElement.FirstChild;
                      InSkippedNode := False;
-                     while (Assigned(CandidateChild)) do
+                     while (Assigned(CandidateChild) and ((not (CandidateChild is TElement)) or (TElement(CandidateChild).GetAttribute('class').AsString <> 'self-link'))) do
                      begin
                         if ((CandidateChild is TElement) and ((TElement(CandidateChild).IsIdentity(nsHTML, eDFN)) or (TElement(CandidateChild).IsIdentity(nsHTML, eSpan)))) then
                         begin
