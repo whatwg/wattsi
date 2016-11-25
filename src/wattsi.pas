@@ -972,7 +972,19 @@ var
             if (Found) then
                continue;
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('    building...'); {$ENDIF}
-            Status := E(eDiv, ['class', 'status'], [E(eInput, ['type', 'button', 'value', kEllipsis, 'onclick', 'toggleStatus(this)'])]);
+
+            if (not Assigned(Context)) then
+               Context := Container.FirstChild
+            else
+               Context := Context.NextSibling;
+            if ((Context is TElement) and (TElement(Context).GetAttribute('class').AsString = 'status')) then
+               Status := TElement(Context)
+            else
+            begin
+               Status := E(eDiv, ['class', 'status'], [E(eInput, ['type', 'button', 'value', kEllipsis, 'onclick', 'toggleStatus(this)'])]);
+               Container.InsertBefore(Status, Context);
+            end;
+
             if (Length(Feature.Bugs) > 0) then
             begin
                P := E(eP, ['class', 'bugs'], [E(eStrong, [T('Spec bugs:')]), T(' ')]);
@@ -1037,11 +1049,6 @@ var
                else
                   Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Soo also: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
             end;
-            if (not Assigned(Context)) then
-               Context := Container.FirstChild
-            else
-               Context := Context.NextSibling;
-            Container.InsertBefore(Status, Context);
          end
          else
          begin
