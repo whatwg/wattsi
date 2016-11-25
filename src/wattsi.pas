@@ -451,7 +451,7 @@ var
          CrossRefListNode^.Topic := CrossReferenceName;
          CrossRefListNode^.LastHeading := LastSeenHeadingID;
          CrossRefListNode^.Element := Element;
-         if (Element.HasAttribute(kCrossRefAttribute) or Element.IsIdentity(nsHTML, eCode)) then
+         if (Element.HasAttribute(kCrossRefAttribute) or Element.IsIdentity(nsHTML, eCode) or (Element.IsIdentity(nsHTML, eSpan) and not Assigned(Element.Attributes))) then
             CrossRefListNode^.Kind := crExplicit
          else
             CrossRefListNode^.Kind := crImplicit;
