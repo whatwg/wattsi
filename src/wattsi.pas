@@ -84,6 +84,7 @@ type
    TVersionedState = record
       State: TImplGoodState;
       Version: UTF8String;
+      LastVersion: UTF8String;
    end;
    TFeature = record
       CanIUseCode: UTF8String;
@@ -1011,7 +1012,7 @@ var
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('    found=', Found); {$ENDIF}
             if (Found) then
             begin
-               P := E(eP, ['class', 'support'], [E(eStrong, [T('Support:')]), T(' ')]);
+               P := E(eP, ['class', 'support'], [E(eStrong, [T('Support:')]), T(' ' + Feature.CanIUseCode, Document)]);
                for BrowserIndex in TBrowserIndex do
                begin
                   if (Feature.FirstGoodVersion[BrowserIndex].Version <> '') then
@@ -1021,14 +1022,16 @@ var
                               P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' yes'], Document,
                                               [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
                                                T(' '),
-                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
+                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('-'),
+                                                         T(Feature.FirstGoodVersion[BrowserIndex].LastVersion, Document)])]));
                            end;
                         sAlmost:
                            begin
                               P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' partial'], Document,
                                               [E(eSpan, [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
                                                          T(' (limited) ')]),
-                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
+                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('-'),
+                                                         T(Feature.FirstGoodVersion[BrowserIndex].LastVersion, Document)])]));
                            end;
                         sNo:
                            begin
@@ -1047,7 +1050,7 @@ var
                if (Found) then
                   Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Source: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]))
                else
-                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Soo also: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
+                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('See also: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
             end;
          end
          else
@@ -2089,6 +2092,7 @@ begin
          for BrowserIndex in TBrowserIndex do
          begin
             Feature.FirstGoodVersion[BrowserIndex].Version := '';
+            Feature.FirstGoodVersion[BrowserIndex].LastVersion := '';
             Browser := Browsers[BrowserIndex];
             for VersionIndex := High(Browsers[BrowserIndex].Versions) downto Low(Browsers[BrowserIndex].Versions) do // $R-
             begin
@@ -2116,6 +2120,8 @@ begin
                      NewState := sAlmost
                   else
                      NewState := sNo;
+                  if (Feature.FirstGoodVersion[BrowserIndex].Version = '') then
+                     Feature.FirstGoodVersion[BrowserIndex].LastVersion := Browser.Versions[VersionIndex];
                   if ((Feature.FirstGoodVersion[BrowserIndex].Version <> '') and (Feature.FirstGoodVersion[BrowserIndex].State <> NewState)) then
                      break;
                   Feature.FirstGoodVersion[BrowserIndex].Version := Browser.Versions[VersionIndex];
