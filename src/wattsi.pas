@@ -2002,11 +2002,25 @@ begin
       Writeln(Message);
 end;
 
+// http://wiki.freepascal.org/UTF8_strings_and_characters#Search_and_copy
+function SplitInHalf(Txt, Separator: UTF8String; out Half1, Half2: UTF8String): Boolean;
+var
+  i: Integer;
+begin
+  i := Pos(Separator, Txt);
+  Result := i > 0;
+  if Result then
+  begin
+    Half1 := Copy(Txt, 1, i-1);
+    Half2 := Copy(Txt, i+Length(Separator), Length(Txt));
+  end;
+end;
+
 procedure PreProcessCanIUseData(const CanIUseJSONFilename: AnsiString);
 var
    CanIUseData, Agent, Version, FeatureData: TJSON;
    Browser: TBrowser;
-   BrowserCode, FeatureCode, SpecURL, RawState, ID: UTF8String;
+   BrowserCode, FeatureCode, SpecURL, RawState, ID, LowVersion, HighVersion: UTF8String;
    CurrentUsage: Double;
    BrowserIndex, CopyIndex: TBrowserIndex;
    VersionIndex, StateIndex: Cardinal;
@@ -2120,11 +2134,16 @@ begin
                      NewState := sAlmost
                   else
                      NewState := sNo;
+                  if (not SplitInHalf(Browser.Versions[VersionIndex], '-', LowVersion, HighVersion)) then
+                  begin
+                     LowVersion := Browser.Versions[VersionIndex];
+                     HighVersion := LowVersion;
+                  end;
                   if (Feature.FirstGoodVersion[BrowserIndex].Version = '') then
-                     Feature.FirstGoodVersion[BrowserIndex].LastVersion := Browser.Versions[VersionIndex];
+                     Feature.FirstGoodVersion[BrowserIndex].LastVersion := HighVersion;
                   if ((Feature.FirstGoodVersion[BrowserIndex].Version <> '') and (Feature.FirstGoodVersion[BrowserIndex].State <> NewState)) then
                      break;
-                  Feature.FirstGoodVersion[BrowserIndex].Version := Browser.Versions[VersionIndex];
+                  Feature.FirstGoodVersion[BrowserIndex].Version := LowVersion;
                   Feature.FirstGoodVersion[BrowserIndex].State := NewState;
                end;
             end;
