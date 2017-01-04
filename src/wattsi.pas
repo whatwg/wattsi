@@ -1012,7 +1012,7 @@ var
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('    found=', Found); {$ENDIF}
             if (Found) then
             begin
-               P := E(eP, ['class', 'support'], [E(eStrong, [T('Support:')]), T(' ' + Feature.CanIUseCode, Document)]);
+               P := E(eP, ['class', 'support'], [E(eStrong, [T('Support:')]), T(' '), T(Feature.CanIUseCode, Document)]);
                for BrowserIndex in TBrowserIndex do
                begin
                   if (Feature.FirstGoodVersion[BrowserIndex].Version <> '') then
