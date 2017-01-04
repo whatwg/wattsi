@@ -79,8 +79,8 @@ type
    TBug = record
       ID, URL, Summary: UTF8String;
    end;
-   TImplState = (sYes, sAlmost, sNo, sPolyfill, sUnknown, sPrefix, sDisabled, sNotes);
-   TImplGoodState = sYes..sNo;
+   TImplState = (sYes, sAlmost, sNo, sRemoved, sPolyfill, sUnknown, sPrefix, sDisabled, sNotes);
+   TImplGoodState = sYes..sRemoved;
    TVersionedState = record
       State: TImplGoodState;
       Version: UTF8String;
@@ -1022,16 +1022,14 @@ var
                               P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' yes'], Document,
                                               [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
                                                T(' '),
-                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('-'),
-                                                         T(Feature.FirstGoodVersion[BrowserIndex].LastVersion, Document)])]));
+                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
                            end;
                         sAlmost:
                            begin
                               P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' partial'], Document,
-                                              [E(eSpan, [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
-                                                         T(' (limited) ')]),
-                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('-'),
-                                                         T(Feature.FirstGoodVersion[BrowserIndex].LastVersion, Document)])]));
+                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document), T(' (limited)')]),
+                                               T(' '),
+                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
                            end;
                         sNo:
                            begin
@@ -1039,6 +1037,13 @@ var
                                               [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
                                                T(' '),
                                                E(eSpan, [T('None')])]));
+                           end;
+                        sRemoved:
+                           begin
+                              P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' no'], Document,
+                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document), T(' (removed)')]),
+                                               T(' '),
+                                               E(eSpan, [T('-'), T(Feature.FirstGoodVersion[BrowserIndex].LastVersion, Document)])]));
                            end;
                      end;
                end;
@@ -2140,7 +2145,11 @@ begin
                      HighVersion := LowVersion;
                   end;
                   if (Feature.FirstGoodVersion[BrowserIndex].Version = '') then
+                  begin
                      Feature.FirstGoodVersion[BrowserIndex].LastVersion := HighVersion;
+                     if ((VersionIndex <> High(Browsers[BrowserIndex].Versions)) and (NewState <> sNo)) then
+                       NewState := sRemoved;
+                  end;
                   if ((Feature.FirstGoodVersion[BrowserIndex].Version <> '') and (Feature.FirstGoodVersion[BrowserIndex].State <> NewState)) then
                      break;
                   Feature.FirstGoodVersion[BrowserIndex].Version := LowVersion;
