@@ -79,11 +79,12 @@ type
    TBug = record
       ID, URL, Summary: UTF8String;
    end;
-   TImplState = (sYes, sAlmost, sNo, sPolyfill, sUnknown, sPrefix, sDisabled, sNotes);
-   TImplGoodState = sYes..sNo;
+   TImplState = (sYes, sAlmost, sNo, sRemoved, sPolyfill, sUnknown, sPrefix, sDisabled, sNotes);
+   TImplGoodState = sYes..sRemoved;
    TVersionedState = record
       State: TImplGoodState;
       Version: UTF8String;
+      LastVersion: UTF8String;
    end;
    TFeature = record
       CanIUseCode: UTF8String;
@@ -1011,7 +1012,7 @@ var
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('    found=', Found); {$ENDIF}
             if (Found) then
             begin
-               P := E(eP, ['class', 'support'], [E(eStrong, [T('Support:')]), T(' ')]);
+               P := E(eP, ['class', 'support'], [E(eStrong, [T('Support:')]), T(' '), T(Feature.CanIUseCode, Document)]);
                for BrowserIndex in TBrowserIndex do
                begin
                   if (Feature.FirstGoodVersion[BrowserIndex].Version <> '') then
@@ -1026,8 +1027,8 @@ var
                         sAlmost:
                            begin
                               P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' partial'], Document,
-                                              [E(eSpan, [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
-                                                         T(' (limited) ')]),
+                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document), T(' (limited)')]),
+                                               T(' '),
                                                E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
                            end;
                         sNo:
@@ -1036,6 +1037,13 @@ var
                                               [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
                                                T(' '),
                                                E(eSpan, [T('None')])]));
+                           end;
+                        sRemoved:
+                           begin
+                              P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' no'], Document,
+                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document), T(' (removed)')]),
+                                               T(' '),
+                                               E(eSpan, [T('-'), T(Feature.FirstGoodVersion[BrowserIndex].LastVersion, Document)])]));
                            end;
                      end;
                end;
@@ -1047,7 +1055,7 @@ var
                if (Found) then
                   Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Source: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]))
                else
-                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Soo also: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
+                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('See also: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
             end;
          end
          else
@@ -1999,11 +2007,26 @@ begin
       Writeln(Message);
 end;
 
+// http://wiki.freepascal.org/UTF8_strings_and_characters#Search_and_copy
+// TODO: SplitInHalf is expensive, should use ropes. https://github.com/whatwg/wattsi/issues/40
+function SplitInHalf(Txt, Separator: UTF8String; out Half1, Half2: UTF8String): Boolean;
+var
+  i: Integer;
+begin
+  i := Pos(Separator, Txt);
+  Result := i > 0;
+  if Result then
+  begin
+    Half1 := Copy(Txt, 1, i-1);
+    Half2 := Copy(Txt, i+Length(Separator), Length(Txt));
+  end;
+end;
+
 procedure PreProcessCanIUseData(const CanIUseJSONFilename: AnsiString);
 var
    CanIUseData, Agent, Version, FeatureData: TJSON;
    Browser: TBrowser;
-   BrowserCode, FeatureCode, SpecURL, RawState, ID: UTF8String;
+   BrowserCode, FeatureCode, SpecURL, RawState, ID, LowVersion, HighVersion: UTF8String;
    CurrentUsage: Double;
    BrowserIndex, CopyIndex: TBrowserIndex;
    VersionIndex, StateIndex: Cardinal;
@@ -2089,6 +2112,7 @@ begin
          for BrowserIndex in TBrowserIndex do
          begin
             Feature.FirstGoodVersion[BrowserIndex].Version := '';
+            Feature.FirstGoodVersion[BrowserIndex].LastVersion := '';
             Browser := Browsers[BrowserIndex];
             for VersionIndex := High(Browsers[BrowserIndex].Versions) downto Low(Browsers[BrowserIndex].Versions) do // $R-
             begin
@@ -2116,9 +2140,20 @@ begin
                      NewState := sAlmost
                   else
                      NewState := sNo;
+                  if (not SplitInHalf(Browser.Versions[VersionIndex], '-', LowVersion, HighVersion)) then
+                  begin
+                     LowVersion := Browser.Versions[VersionIndex];
+                     HighVersion := LowVersion;
+                  end;
+                  if (Feature.FirstGoodVersion[BrowserIndex].Version = '') then
+                  begin
+                     Feature.FirstGoodVersion[BrowserIndex].LastVersion := HighVersion;
+                     if ((VersionIndex <> High(Browsers[BrowserIndex].Versions)) and (NewState <> sNo)) then
+                       NewState := sRemoved;
+                  end;
                   if ((Feature.FirstGoodVersion[BrowserIndex].Version <> '') and (Feature.FirstGoodVersion[BrowserIndex].State <> NewState)) then
                      break;
-                  Feature.FirstGoodVersion[BrowserIndex].Version := Browser.Versions[VersionIndex];
+                  Feature.FirstGoodVersion[BrowserIndex].Version := LowVersion;
                   Feature.FirstGoodVersion[BrowserIndex].State := NewState;
                end;
             end;
