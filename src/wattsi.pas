@@ -2008,6 +2008,7 @@ begin
 end;
 
 // http://wiki.freepascal.org/UTF8_strings_and_characters#Search_and_copy
+// TODO: SplitInHalf is expensive, should use ropes. https://github.com/whatwg/wattsi/issues/40
 function SplitInHalf(Txt, Separator: UTF8String; out Half1, Half2: UTF8String): Boolean;
 var
   i: Integer;
