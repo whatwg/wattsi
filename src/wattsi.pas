@@ -1316,7 +1316,7 @@ var
             TempElement := E(eSpan, [kCrossRefAttribute, 'fingerprinting vector',
                                      'title', 'There is a potential fingerprinting vector here.',
                                      'class', 'fingerprint'],
-                                    [E(eImg, ['src', '/images/fingerprint.png',
+                                    [E(eImg, ['src', 'https://resources.whatwg.org/fingerprint.svg',
                                               'alt', '(This is a fingerprinting vector.)',
                                               'width', '46',
                                               'height', '64'])]);
