@@ -964,7 +964,7 @@ var
                   for Bug in Feature.Bugs do
                      Writeln('   ', Bug.URL);
                   if (Feature.CanIUseCode <> '') then
-                     Writeln('   http://caniuse.com/#feat=', Feature.CanIUseCode);
+                     Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
                   Found := True;
                end;
                Ancestor := Ancestor.ParentNode;
@@ -1053,9 +1053,9 @@ var
             if (Length(Feature.CanIUseCode) > 0) then
             begin
                if (Found) then
-                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Source: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]))
+                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Source: '), E(eA, ['href', 'https://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]))
                else
-                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('See also: '), E(eA, ['href', 'http://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
+                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('See also: '), E(eA, ['href', 'https://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
             end;
          end
          else
@@ -1064,7 +1064,7 @@ var
             for Bug in Feature.Bugs do
                Writeln('   ', Bug.URL);
             if (Feature.CanIUseCode <> '') then
-               Writeln('   http://caniuse.com/#feat=', Feature.CanIUseCode);
+               Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
          end;
       end;
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('END OF ANNOTATIONS'); {$ENDIF}
