@@ -470,7 +470,7 @@ var
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
-      Element, HeadingSelfLink, NewLI, SecondLI, NewLink, NewP, NewI, TempElement: TElement;
+      Element, HeadingSelfLink, NewLI, SecondLI, NewLink, NewP, NewI, NewSpan, TempElement: TElement;
       Scratch, ImageSrc: Rope;
       ExtractedData: CutRope;
       ClassName, Instruction, CrossReferenceName, Revision, ReferenceName: UTF8String;
@@ -569,8 +569,11 @@ var
                            Scratch.Append($002E);
                         Scratch.Append(IntToStr(CurrentSectionNumber[CurrentHeadingRank]));
                      end;
-                     Scratch.Append($0020);
-                     Element.InsertBefore(TText.CreateDestructively(Scratch), Element.FirstChild);
+                     NewSpan := ConstructHTMLElement(eSpan);
+                     NewSpan.SetAttribute('class', 'secno');
+                     NewSpan.appendChild(TText.CreateDestructively(Scratch));
+                     Element.InsertBefore(TText.Create(#$0020), Element.FirstChild);
+                     Element.InsertBefore(NewSpan, Element.FirstChild);
                   end;
                   if (Assigned(LastTOCOL) or Assigned(SmallTOC)) then
                   begin
