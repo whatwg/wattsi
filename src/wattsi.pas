@@ -45,6 +45,7 @@ uses
 
 var
    Quiet: Boolean = false;
+   Version: Byte = (*$I version.inc *); // unsigned integer from 0 .. 255
 
 type
    TAllVariants = (vHTML, vDEV, vSplit);
@@ -2276,10 +2277,17 @@ begin
          ParamOffset := 1;
       end
       else
+      if ((ParamCount() = 1) and (ParamStr(1) = '--version')) then
+      begin
+         Writeln('wattsi ' + IntToStr(Version));
+         exit;
+      end
+      else
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
          Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
+         Writeln('  wattsi --version');
          exit;
       end;
    SourceFile := ParamStr(1 + ParamOffset);
