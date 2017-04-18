@@ -45,7 +45,7 @@ uses
 
 var
    Quiet: Boolean = false;
-   Version: Byte = (*$I version.inc *); // unsigned integer from 0 .. 255
+   Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
 
 type
    TAllVariants = (vHTML, vDEV, vSplit);
