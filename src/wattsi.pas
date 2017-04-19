@@ -697,6 +697,7 @@ var
                if (Assigned(InHeading)) then
                begin
                   DFNEntry.DFNElement := InHeading;
+                  EnsureID(Element, MungeTopicToID(CrossReferenceName));
                   if (Element.HasAttribute(kCrossSpecRefAttribute)) then
                      Fail('A deferring definition can''t be in a heading, but this one is: ' + Describe(Element));
                end
