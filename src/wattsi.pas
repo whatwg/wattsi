@@ -298,7 +298,7 @@ var
       for IndexSource := 1 to Length(Original) do // $R-
       begin
          case Original[IndexSource] of
-            ' ', #$0A, '<', '>', '[', #$5C, ']', '^', '{', '|', '}':
+            ' ', #$0A, '<', '>', '[', #$5C, ']', '^', '{', '|', '}', '%':
                begin
                   if (not HadSpace) then
                   begin
