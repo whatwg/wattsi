@@ -517,7 +517,7 @@ var
    end;
 
    var
-      SplitFilename, LastSeenHeadingText: UTF8String;
+      SplitFilename, SplitFilenameClassName, LastSeenHeadingText: UTF8String;
       LastSeenHeadingID, LastSeenReferenceName: UTF8String;
       InHeading, InReferences, InDFN: TElement;
 
@@ -553,7 +553,7 @@ var
          New(CrossRefListNode);
          CrossRefListNode^.Topic := CrossReferenceName;
          CrossRefListNode^.LastHeading := LastSeenHeadingID;
-         if ((SplitFilename = 'indices') or (SplitFilename = 'acknowledgements')) then
+         if (SplitFilenameClassName = 'no-num') then
             CrossRefListNode^.LastHeadingText := LastSeenHeadingText
          else
             CrossRefListNode^.LastHeadingText := SectionNumber.AsString + ' ' + LastSeenHeadingText;
@@ -601,6 +601,7 @@ var
                InHeading := Element;
                if (Element.HasAttribute('split-filename')) then
                   SplitFilename := Element.GetAttribute('split-filename').AsString;
+                  SplitFilenameClassName := Element.GetAttribute('class').AsString;
                LastSeenHeadingText := Element.TextContent.AsString;
                LastSeenHeadingID := MungeTopicToID(Element.TextContent.AsString);
                if (LastSeenHeadingID = '') then
