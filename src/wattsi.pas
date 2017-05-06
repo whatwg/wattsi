@@ -47,6 +47,7 @@ uses
 var
    Quiet: Boolean = false;
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
+   OutputDirectory: AnsiString;
 
 type
    TAllVariants = (vHTML, vDEV, vSplit);
@@ -236,7 +237,7 @@ var
             Xrefs.Append('}');
          end;
       Xrefs.Append('}');
-      Assign(XrefsFile, 'xrefs.json');
+      Assign(XrefsFile, OutputDirectory + '/xrefs.json');
       Rewrite(XrefsFile);
       Write(XrefsFile, Xrefs.AsString);
       Close(XrefsFile);
@@ -2396,7 +2397,6 @@ var
    ParamOffset: Integer = 0;
    SourceFile: AnsiString;
    Source: TFileData;
-   OutputDirectory: AnsiString;
    Parser: THTMLParser;
    BigTOC: TElement;
    Documents: array[TVariants] of TDocument;
