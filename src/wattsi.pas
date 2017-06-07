@@ -38,6 +38,7 @@ use <a [lt]> instead of <span [data-x]>
 {$IFDEF DEBUG} {$DEFINE TIMINGS} {$ENDIF}
 
 uses
+   classes, fgl, strutils, // for TStringList, TFPGMap, DelSpace1
    sysutils, {$IFOPT C+} rtlutils, {$ENDIF} fileutils, stringutils,
    dateutils, genericutils, hashfunctions, hashtable, hashset,
    plasticarrays, exceptions, unicode, ropes, wires, canonicalstrings,
@@ -46,6 +47,7 @@ uses
 var
    Quiet: Boolean = false;
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
+   OutputDirectory: AnsiString;
 
 type
    TAllVariants = (vHTML, vDEV, vSplit);
@@ -135,6 +137,7 @@ type
    TCrossRefKind = (crExplicit, crImplicit);
    PCrossReferenceListNode = ^TCrossReferenceListNode;
    TCrossReferenceListNode = record
+      LastHeadingText, SplitFilename: UTF8String;
       Topic, LastHeading: UTF8String;
       Element: TElement;
       Kind: TCrossRefKind;
@@ -147,6 +150,11 @@ type
 
 type
    TReferences = specialize THashTable <UTF8String, PElementListNode, UTF8StringUtils>;
+   // Because we need to output lists of section names in order and lists of
+   // xref anchors in order, for those instead of THashTable (which doesn't
+   // preserve order), we use TFPGMap & TStringList (which both preserve order).
+   TXrefAnchorsBySectionName = specialize TFPGMap <UTF8String, TStringList>;
+   TXrefsByDFNAnchor = specialize THashTable <UTF8String, TXrefAnchorsBySectionName, UTF8StringUtils>;
 
 var
    IDs: TElementMap; // The keys in these hashtables must outlive the DOM, since the DOM points to those strings
@@ -159,6 +167,90 @@ var
    CurrentSectionNumber: array[THeadingRank] of Cardinal;
    StringStore: TStringStore;
    Errors: Cardinal;
+   XrefsByDFNAnchor: TXrefsByDFNAnchor;
+
+   function NewXrefsByDFNAnchor(SectionName: UTF8String; Anchor: UTF8String): TXrefAnchorsBySectionName;
+   var
+      Anchors: TStringList;
+      XrefAnchorsBySectionName: TXrefAnchorsBySectionName;
+   begin
+      Anchors := TStringList.Create;
+      Anchors.Add(Anchor);
+      XrefAnchorsBySectionName := TXrefAnchorsBySectionName.Create;
+      XrefAnchorsBySectionName.Add(SectionName, Anchors);
+      Result := XrefAnchorsBySectionName;
+   end;
+
+   function NewXrefAnchorsBySectionName(SectionName: UTF8String; Anchor: UTF8String): TXrefAnchorsBySectionName;
+   var
+      Anchors: TStringList;
+      XrefAnchorsBySectionName: TXrefAnchorsBySectionName;
+   begin
+      Anchors := TStringList.Create;
+      Anchors.Add(Anchor);
+      XrefAnchorsBySectionName := TXrefAnchorsBySectionName.Create;
+      XrefAnchorsBySectionName.Add(SectionName, Anchors);
+      Result := XrefAnchorsBySectionName;
+   end;
+
+   procedure XrefsToJSON(XrefsByDFNAnchor: TXrefsByDFNAnchor);
+   var
+      DFNAnchor, SectionName, Anchor: UTF8String;
+      IsFirstDFN, IsFirstSectionName, IsFirstAnchor: boolean;
+      Xrefs: Rope;
+      XrefsFile: Text;
+      i: integer;
+   begin
+      Xrefs := Default(Rope);
+      Xrefs.Append('{');
+      IsFirstDFN := True;
+      for DFNAnchor in XrefsByDFNAnchor do
+         begin
+            if (not IsFirstDFN) then
+               Xrefs.Append(',');
+            IsFirstDFN := False;
+            Xrefs.Append('"');
+            Xrefs.Append(@DFNAnchor);
+            Xrefs.Append('":{');
+            IsFirstSectionName := True;
+            for i := 0 to XrefsByDFNAnchor[DFNAnchor].Count - 1 do
+            begin
+               if (not IsFirstSectionName) then
+                  Xrefs.Append(',');
+               IsFirstSectionName := False;
+               Xrefs.Append('"');
+               SectionName := XrefsByDFNAnchor[DFNAnchor].Keys[i];
+               Xrefs.Append(@SectionName);
+               Xrefs.Append('":[');
+               IsFirstAnchor := True;
+               for Anchor in XrefsByDFNAnchor[DFNAnchor][SectionName] do
+               begin
+                  if (not IsFirstAnchor) then
+                     Xrefs.Append(',');
+                  IsFirstAnchor := False;
+                  Xrefs.Append('"');
+                  Xrefs.Append(@Anchor);
+                  Xrefs.Append('"');
+               end;
+               Xrefs.Append(']');
+            end;
+            Xrefs.Append('}');
+         end;
+      Xrefs.Append('}');
+      Assign(XrefsFile, OutputDirectory + '/xrefs.json');
+      Rewrite(XrefsFile);
+      Write(XrefsFile, Xrefs.AsString);
+      Close(XrefsFile);
+   end;
+
+   function NewAnchorSet(Anchor: UTF8String): TStringList;
+   var
+      Anchors: TStringList;
+   begin
+      Anchors := TStringList.Create;
+      Anchors.Add(Anchor);
+      Result := Anchors;
+   end;
 
    procedure Fail(Message: UTF8String);
    var
@@ -426,6 +518,7 @@ var
    end;
 
    var
+      SplitFilename, SplitFilenameClassName, LastSeenHeadingText: UTF8String;
       LastSeenHeadingID, LastSeenReferenceName: UTF8String;
       InHeading, InReferences, InDFN: TElement;
 
@@ -434,6 +527,8 @@ var
       CrossReferenceName: UTF8String;
       CrossRefListNode: PCrossReferenceListNode;
       DFNEntry: TDFNEntry;
+      SectionNumber: Rope;
+      CurrentHeadingRank: THeadingRank;
    begin
       CrossReferenceName := GetTopicIdentifier(Element);
       if (not CrossReferenceName.IsEmpty) then
@@ -448,10 +543,22 @@ var
             end;
             DFNEntry.SubDFNElement := Element;
          end;
+         SectionNumber := Default(Rope);
+         for CurrentHeadingRank := 2 to LastHeadingRank do
+         begin
+            if (CurrentHeadingRank > 2) then
+               SectionNumber.Append($002E);
+            SectionNumber.Append(IntToStr(CurrentSectionNumber[CurrentHeadingRank]));
+         end;
          Inc(DFNEntry.UsageCount);
          New(CrossRefListNode);
          CrossRefListNode^.Topic := CrossReferenceName;
          CrossRefListNode^.LastHeading := LastSeenHeadingID;
+         if (SplitFilenameClassName = 'no-num') then
+            CrossRefListNode^.LastHeadingText := LastSeenHeadingText
+         else
+            CrossRefListNode^.LastHeadingText := SectionNumber.AsString + ' ' + LastSeenHeadingText;
+         CrossRefListNode^.SplitFilename := SplitFilename;
          CrossRefListNode^.Element := Element;
          if (Element.HasAttribute(kCrossRefAttribute) or Element.IsIdentity(nsHTML, eCode) or (Element.IsIdentity(nsHTML, eSpan) and not Assigned(Element.Attributes))) then
             CrossRefListNode^.Kind := crExplicit
@@ -493,6 +600,10 @@ var
             if (CurrentHeadingRank > 1) then
             begin
                InHeading := Element;
+               if (Element.HasAttribute('split-filename')) then
+                  SplitFilename := Element.GetAttribute('split-filename').AsString;
+                  SplitFilenameClassName := Element.GetAttribute('class').AsString;
+               LastSeenHeadingText := Element.TextContent.AsString;
                LastSeenHeadingID := MungeTopicToID(Element.TextContent.AsString);
                if (LastSeenHeadingID = '') then
                   LastSeenHeadingID := 'blank-heading';
@@ -1081,7 +1192,9 @@ var
    NewLink, DFN: TElement;
    DFNEntry: TDFNEntry;
    ListNodeHead, ListNode, NextListNode: PElementListNode;
+   Anchor, DFNAnchor, SectionName: UTF8String;
 begin
+   XrefsByDFNAnchor := TXrefsByDFNAnchor.Create(@UTF8StringHash32);
    IDs := TElementMap.Create(@UTF8StringHash32);
    Document.TakeOwnership(IDs);
    StringStore := TStringStore.Create();
@@ -1132,6 +1245,23 @@ begin
                   EnsureID(CrossRefNode^.Element, CrossRefNode^.LastHeading + ':' + ID.AsString);
                   NewLink := ConstructHTMLElement(eA);
                   CrossRefNode^.Element.SwapChildNodes(NewLink);
+                  if ((Variant <> vDEV) and (not DFN.HasAttribute(kCrossSpecRefAttribute))) then
+                  begin
+                     DFNAnchor := ID.AsString;
+                     SectionName := DelSpace1(StringReplace(StringReplace(CrossRefNode^.LastHeadingText, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
+                     Anchor := CrossRefNode^.SplitFilename.AsString + '.html#' + CrossRefNode^.Element.GetAttribute('id').AsString;
+                     if (not XrefsByDFNAnchor.Has(DFNAnchor)) then
+                     begin
+                        XrefsByDFNAnchor.Add(DFNAnchor, NewXrefsByDFNAnchor(SectionName, Anchor));
+                     end;
+                     if (XrefsByDFNAnchor[DFNAnchor].IndexOf(SectionName) = -1) then
+                     begin
+                        XrefsByDFNAnchor[DFNAnchor].Add(SectionName, NewAnchorSet(Anchor));
+                     end
+                     else
+                       if (XrefsByDFNAnchor[DFNAnchor][SectionName].IndexOf(Anchor) = -1) then
+                          XrefsByDFNAnchor[DFNAnchor][SectionName].Add(Anchor);
+                  end;
                   if (CrossRefNode^.Element.IsIdentity(nsHTML, eSpan)) then
                   begin
                      if (CrossRefNode^.Element.HasAttribute('id')) then
@@ -1184,6 +1314,8 @@ begin
          end;
          if (Variant <> vDEV) then
          begin
+            {$IFDEF DEBUG} Writeln('Writing xrefs.json...'); {$ENDIF}
+            XrefsToJSON(XrefsByDFNAnchor);
             {$IFDEF DEBUG} Writeln('Inserting annotations...'); {$ENDIF}
             InsertAnnotations();
          end;
@@ -2265,7 +2397,6 @@ var
    ParamOffset: Integer = 0;
    SourceFile: AnsiString;
    Source: TFileData;
-   OutputDirectory: AnsiString;
    Parser: THTMLParser;
    BigTOC: TElement;
    Documents: array[TVariants] of TDocument;
