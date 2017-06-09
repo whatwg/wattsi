@@ -473,7 +473,7 @@ end;
 {$ENDIF}
 
 
-procedure THTMLHeadingElement.AfterConstruction(); 
+procedure THTMLHeadingElement.AfterConstruction();
 begin
    inherited;
    if (LocalName = eH1) then
@@ -836,7 +836,8 @@ initialization
    RegisterHTMLElement('big', eBig, THTMLElement, 0);
    RegisterHTMLElement('blink', eBlink, THTMLUnknownElement, 0);
    RegisterHTMLElement('blockquote', eBlockQuote, THTMLQuoteElement, propSpecial or propSpecialish or propAutoclosesP);
-   RegisterHTMLElement('body', eBody, THTMLBodyElement, propSpecial or propSpecialish or propEOFImpliedEndTag or propOptionalStartTag or propOptionalEndTag);
+   // propOptionalStartTag commented out for 'body' because HTML uses <script> as first element in body
+   RegisterHTMLElement('body', eBody, THTMLBodyElement, propSpecial or propSpecialish or propEOFImpliedEndTag or (*propOptionalStartTag or*) propOptionalEndTag);
    RegisterHTMLElement('br', eBr, THTMLBRElement, propSpecial or propSpecialish or propVoidElement or propCannotContainPalpableText);
    RegisterHTMLElement('button', eButton, THTMLButtonElement, propButtonScope or propSpecial or propSpecialish);
    RegisterHTMLElement('canvas', eCanvas, THTMLCanvasElement, 0);
