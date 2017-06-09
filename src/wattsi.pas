@@ -1245,7 +1245,7 @@ begin
                   EnsureID(CrossRefNode^.Element, CrossRefNode^.LastHeading + ':' + ID.AsString);
                   NewLink := ConstructHTMLElement(eA);
                   CrossRefNode^.Element.SwapChildNodes(NewLink);
-                  if ((Variant <> vDEV) and (not DFN.HasAttribute(kCrossSpecRefAttribute))) then
+                  if (Variant <> vDEV) then
                   begin
                      DFNAnchor := ID.AsString;
                      SectionName := DelSpace1(StringReplace(StringReplace(CrossRefNode^.LastHeadingText, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
