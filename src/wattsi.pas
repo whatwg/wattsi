@@ -835,6 +835,11 @@ var
             SaveCrossReference(Element);
          end
          else
+         if (Element.IsIdentity(nsHTML, ePre) and (Element.GetAttribute('class').AsString = 'idl') and (Variant = vDEV)) then
+         begin
+            Result := False;
+         end
+         else
          if (Element.IsIdentity(nsHTML, eSpan)) then
          begin
             if (Element.HasAttribute(kLTAttribute)) then
@@ -936,7 +941,7 @@ var
             end;
          end
          else
-         if (Instruction = 'smalltoc') then
+         if ((Instruction = 'smalltoc') and (Variant <> vDEV)) then
          begin
             if (LastHeadingRank <> 2) then
             begin
@@ -963,7 +968,7 @@ var
             Result := ProcessNode(Node);
          end
          else
-         if (Instruction = 'INSERT FINGERPRINT') then
+         if ((Instruction = 'INSERT FINGERPRINT') and (Variant <> vDEV)) then
          begin
             TempElement := E(eSpan, [kCrossRefAttribute, 'fingerprinting vector',
                                      'title', 'There is a potential fingerprinting vector here.',
