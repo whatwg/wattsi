@@ -1943,7 +1943,7 @@ begin
    end;
    // save table of contents section
    SectionDoc := Document.CloneNode(True);
-   SectionDoc.DocumentElement.SetAttribute('class', 'split');
+   SectionDoc.DocumentElement.SetAttribute('class', 'split index');
    Save(SectionDoc, Base + kIndexFilename);
    SectionDoc.Free();
    BigTOC.Remove();
