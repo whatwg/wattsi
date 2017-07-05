@@ -1106,7 +1106,7 @@ var
                Container.InsertBefore(Status, Context);
             end;
 
-            if (Length(Feature.Bugs) > 0) then
+            if ((Length(Feature.Bugs) > 0) and (Variant <> vDEV)) then
             begin
                P := E(eP, ['class', 'bugs'], [E(eStrong, [T('Spec bugs:')]), T(' ')]);
                First := True;
@@ -1180,11 +1180,19 @@ var
          end
          else
          begin
-            Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
-            for Bug in Feature.Bugs do
-               Writeln('   ', Bug.URL);
-            if (Feature.CanIUseCode <> '') then
+            if (Variant <> vDEV) then
+            begin
+               Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
+               for Bug in Feature.Bugs do
+                  Writeln('   ', Bug.URL);
+               if (Feature.CanIUseCode <> '') then
+                  Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
+            end
+            else if (Feature.CanIUseCode <> '') then
+            begin
+               Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
                Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
+            end;
          end;
       end;
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('END OF ANNOTATIONS'); {$ENDIF}
@@ -1321,9 +1329,9 @@ begin
          begin
             {$IFDEF DEBUG} Writeln('Writing xrefs.json...'); {$ENDIF}
             XrefsToJSON(XrefsByDFNAnchor);
-            {$IFDEF DEBUG} Writeln('Inserting annotations...'); {$ENDIF}
-            InsertAnnotations();
          end;
+         {$IFDEF DEBUG} Writeln('Inserting annotations...'); {$ENDIF}
+         InsertAnnotations();
          {$IFDEF DEBUG} Writeln('Inserting tables of contents...'); {$ENDIF}
          if (Assigned(BigTOCBookmark)) then
          begin
