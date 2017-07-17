@@ -1194,7 +1194,8 @@ var
                if (Feature.CanIUseCode <> '') then
                   Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
             end
-            else if (Feature.CanIUseCode <> '') then
+            else
+            if (Feature.CanIUseCode <> '') then
             begin
                Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
                Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
