@@ -601,8 +601,10 @@ var
             begin
                InHeading := Element;
                if (Element.HasAttribute('split-filename')) then
+               begin
                   SplitFilename := Element.GetAttribute('split-filename').AsString;
                   SplitFilenameClassName := Element.GetAttribute('class').AsString;
+               end;
                LastSeenHeadingText := Element.TextContent.AsString;
                LastSeenHeadingID := MungeTopicToID(Element.TextContent.AsString);
                if (LastSeenHeadingID = '') then
