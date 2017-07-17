@@ -48,6 +48,8 @@ var
    Quiet: Boolean = false;
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
    OutputDirectory: AnsiString;
+   SearchIndexJsonFile: Text;
+   IsFirstSearchIndexItem: Boolean = true;
 
 type
    TAllVariants = (vHTML, vDEV, vSplit);
@@ -155,6 +157,7 @@ type
    // preserve order), we use TFPGMap & TStringList (which both preserve order).
    TXrefAnchorsBySectionName = specialize TFPGMap <UTF8String, TStringList>;
    TXrefsByDFNAnchor = specialize THashTable <UTF8String, TXrefAnchorsBySectionName, UTF8StringUtils>;
+   THeadingTextBySectionNumber = specialize THashTable <UTF8String, UTF8String, UTF8StringUtils>;
 
 var
    IDs: TElementMap; // The keys in these hashtables must outlive the DOM, since the DOM points to those strings
@@ -168,6 +171,7 @@ var
    StringStore: TStringStore;
    Errors: Cardinal;
    XrefsByDFNAnchor: TXrefsByDFNAnchor;
+   HeadingTextBySectionNumber: THeadingTextBySectionNumber;
 
    function NewXrefsByDFNAnchor(SectionName: UTF8String; Anchor: UTF8String): TXrefAnchorsBySectionName;
    var
@@ -588,6 +592,7 @@ var
       Enumerator: RopeEnumerator;
       ListNode: PElementListNode;
       DFNEntry: TDFNEntry;
+      ID, HeadingText, ParentHeadingText, SectionNumber, ParentSectionNumber: UTF8String;
    begin
       Result := True;
       if (Node is TElement) then
@@ -681,11 +686,61 @@ var
                            Scratch.Append($002E);
                         Scratch.Append(IntToStr(CurrentSectionNumber[CurrentHeadingRank]));
                      end;
+                     if (Variant = vDEV) then
+                     begin
+                        ID := Element.GetAttribute('id').AsString;
+                        SectionNumber := Scratch.AsString;
+                        HeadingText := DelSpace1(StringReplace(StringReplace(Element.TextContent.AsString, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
+                        if (not IsFirstSearchIndexItem) then
+                           Write(SearchIndexJsonFile, ',');
+                        IsFirstSearchIndexItem := False;
+                        Write(SearchIndexJsonFile, '{');
+                        Write(SearchIndexJsonFile, '"url":"' + SplitFilename + '.html#' + ID + '",');
+                        Write(SearchIndexJsonFile, '"text":"' + HeadingText + '",');
+                        if (LastDelimiter('.', SectionNumber) <> 0) then
+                        begin
+                           ParentSectionNumber := Copy(SectionNumber, 1, LastDelimiter('.', SectionNumber) - 1);
+                           ParentHeadingText := HeadingTextBySectionNumber[ParentSectionNumber];
+                           Write(SearchIndexJsonFile, '"section":"' + SectionNumber + ' ' + UTF8Encode(#$2014) + ' ' + ParentHeadingText + '"');
+                        end
+                        else
+                        begin
+                           Write(SearchIndexJsonFile, '"section":"' + SectionNumber + '"');
+                        end;
+                        Write(SearchIndexJsonFile, '}');
+                        HeadingTextBySectionNumber[SectionNumber] := HeadingText;
+                     end;
                      NewSpan := ConstructHTMLElement(eSpan);
                      NewSpan.SetAttribute('class', 'secno');
                      NewSpan.appendChild(TText.CreateDestructively(Scratch));
                      Element.InsertBefore(TText.Create(#$0020), Element.FirstChild);
                      Element.InsertBefore(NewSpan, Element.FirstChild);
+                  end
+                  else
+                  begin
+                     // TODO Find a more robust way to populate the search index
+                     // for this no-num backmatter stuff (Index, References,
+                     // Acknowledgments) because the below is brittle.
+                     if (Variant = vDEV) then
+                     begin
+                        ID := Element.GetAttribute('id').AsString;
+                        HeadingText := DelSpace1(StringReplace(StringReplace(Element.TextContent.AsString, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
+                        Write(SearchIndexJsonFile, ',{');
+                        Write(SearchIndexJsonFile, '"url": "' + SplitFilename + '.html#' + ID + '",');
+                        Write(SearchIndexJsonFile, '"text": "' + HeadingText + '",');
+                        // TODO Especially find a better way for this particular
+                        // bit, given it'll break if there's a change to either
+                        // the split-filename or id value for the Index section.
+                        if ((SplitFilename = 'indices') and (ID <> 'index')) then
+                        begin
+                          Write(SearchIndexJsonFile, '"section": "' + ' ' + UTF8Encode(#$2014) + ' Index"');
+                        end
+                        else
+                        begin
+                          Write(SearchIndexJsonFile, '"section": ""');
+                        end;
+                        Write(SearchIndexJsonFile, '}');
+                     end;
                   end;
                   if (Assigned(LastTOCOL) or Assigned(SmallTOC)) then
                   begin
@@ -1200,6 +1255,7 @@ var
    Anchor, DFNAnchor, SectionName: UTF8String;
 begin
    XrefsByDFNAnchor := TXrefsByDFNAnchor.Create(@UTF8StringHash32);
+   HeadingTextBySectionNumber := THeadingTextBySectionNumber.Create(@UTF8StringHash32);
    IDs := TElementMap.Create(@UTF8StringHash32);
    Document.TakeOwnership(IDs);
    StringStore := TStringStore.Create();
@@ -1225,8 +1281,24 @@ begin
          {$IFDEF DEBUG} Writeln('Finding IDs and stripping excluded sections...'); {$ENDIF}
          FirstPass();
          // Second pass - make the changes to the DOM that we need
-         {$IFDEF DEBUG} Writeln('Adjusting headers, references, finding cross-references...'); {$ENDIF}
-         SecondPass();
+         if (Variant = vDEV) then
+         begin
+            {$IFDEF DEBUG} Writeln('Adjusting headers, references, finding cross-references, creating search-index.json...'); {$ENDIF}
+            Assign(SearchIndexJsonFile, OutputDirectory + '/multipage-dev/search-index.json');
+            Rewrite(SearchIndexJsonFile);
+            Write(SearchIndexJsonFile, '[');
+            SecondPass();
+            try
+               Write(SearchIndexJsonFile, ']');
+               Close(SearchIndexJsonFile);
+            except
+            end;
+         end
+         else
+         begin
+            {$IFDEF DEBUG} Writeln('Adjusting headers, references, finding cross-references...'); {$ENDIF}
+            SecondPass();
+         end;
          // Insert cross-references
          {$IFDEF DEBUG} Writeln('Inserting cross-references...'); {$ENDIF}
          CrossRefNode := CrossReferences.First;
@@ -2496,6 +2568,7 @@ begin
                // gen...
                for Variant in TVariants do
                begin
+                  MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
                   Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
                   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
                   ProcessDocument(Documents[Variant], Variant, BigTOC); // $R-
@@ -2511,7 +2584,6 @@ begin
                   // multipage...
                   {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
                   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                  MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
                   if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
                      raise EAbort.Create('Could not split specification');
                   {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
