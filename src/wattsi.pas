@@ -48,7 +48,7 @@ var
    Quiet: Boolean = false;
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
    OutputDirectory: AnsiString;
-   SearchIndexJsonText: Text;
+   SearchIndexJsonFile: Text;
    IsFirstSearchIndexItem: Boolean = true;
 
 type
@@ -700,22 +700,22 @@ var
                         SectionNumber := Scratch.AsString;
                         HeadingText := MungeForJsonOutput(Element.TextContent.AsString);
                         if (not IsFirstSearchIndexItem) then
-                           Write(SearchIndexJsonText, ',');
+                           Write(SearchIndexJsonFile, ',');
                         IsFirstSearchIndexItem := False;
-                        Write(SearchIndexJsonText, '{');
-                        Write(SearchIndexJsonText, '"url":"' + SplitFilename + '.html#' + ID + '",');
-                        Write(SearchIndexJsonText, '"text":"' + HeadingText + '",');
+                        Write(SearchIndexJsonFile, '{');
+                        Write(SearchIndexJsonFile, '"url":"' + SplitFilename + '.html#' + ID + '",');
+                        Write(SearchIndexJsonFile, '"text":"' + HeadingText + '",');
                         if (LastDelimiter('.', SectionNumber) <> 0) then
                         begin
                            ParentSectionNumber := Copy(SectionNumber, 1, LastDelimiter('.', SectionNumber) - 1);
                            ParentHeadingText := HeadingTextBySectionNumber[ParentSectionNumber];
-                           Write(SearchIndexJsonText, '"section":"' + SectionNumber + ' ' + UTF8Encode(#$2014) + ' ' + ParentHeadingText + '"');
+                           Write(SearchIndexJsonFile, '"section":"' + SectionNumber + ' ' + UTF8Encode(#$2014) + ' ' + ParentHeadingText + '"');
                         end
                         else
                         begin
-                           Write(SearchIndexJsonText, '"section":"' + SectionNumber + '"');
+                           Write(SearchIndexJsonFile, '"section":"' + SectionNumber + '"');
                         end;
-                        Write(SearchIndexJsonText, '}');
+                        Write(SearchIndexJsonFile, '}');
                         HeadingTextBySectionNumber[SectionNumber] := HeadingText;
                      end;
                      NewSpan := ConstructHTMLElement(eSpan);
@@ -736,22 +736,22 @@ var
                      begin
                         ID := Element.GetAttribute('id').AsString;
                         HeadingText := MungeForJsonOutput(Element.TextContent.AsString);
-                        Write(SearchIndexJsonText, ',{');
-                        Write(SearchIndexJsonText, '"url": "' + SplitFilename + '.html#' + ID + '",');
-                        Write(SearchIndexJsonText, '"text": "' + HeadingText + '",');
+                        Write(SearchIndexJsonFile, ',{');
+                        Write(SearchIndexJsonFile, '"url": "' + SplitFilename + '.html#' + ID + '",');
+                        Write(SearchIndexJsonFile, '"text": "' + HeadingText + '",');
                         // TODO Especially find a better way for this particular
                         // bit, given it'll break if there's a change to either
                         // the split-filename or id value for the Index section.
                         // It's possible that LastTOCLI could help here.
                         if ((SplitFilename = 'indices') and (ID <> 'index')) then
                         begin
-                          Write(SearchIndexJsonText, '"section": "' + ' ' + UTF8Encode(#$2014) + ' Index"');
+                          Write(SearchIndexJsonFile, '"section": "' + ' ' + UTF8Encode(#$2014) + ' Index"');
                         end
                         else
                         begin
-                          Write(SearchIndexJsonText, '"section": ""');
+                          Write(SearchIndexJsonFile, '"section": ""');
                         end;
-                        Write(SearchIndexJsonText, '}');
+                        Write(SearchIndexJsonFile, '}');
                      end;
                   end;
                   if (Assigned(LastTOCOL) or Assigned(SmallTOC)) then
@@ -1296,12 +1296,12 @@ begin
          if (Variant = vDEV) then
          begin
             {$IFDEF DEBUG} Writeln('Adjusting headers, references, finding cross-references, creating search-index.json...'); {$ENDIF}
-            Assign(SearchIndexJsonText, OutputDirectory + '/multipage-dev/search-index.json');
-            Rewrite(SearchIndexJsonText);
-            Write(SearchIndexJsonText, '[');
+            Assign(SearchIndexJsonFile, OutputDirectory + '/multipage-dev/search-index.json');
+            Rewrite(SearchIndexJsonFile);
+            Write(SearchIndexJsonFile, '[');
             SecondPass();
-            Write(SearchIndexJsonText, ']');
-            Close(SearchIndexJsonText);
+            Write(SearchIndexJsonFile, ']');
+            Close(SearchIndexJsonFile);
          end
          else
          begin
