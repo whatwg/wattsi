@@ -48,7 +48,7 @@ var
    Quiet: Boolean = false;
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
    OutputDirectory: AnsiString;
-   SearchIndexJsonFile: Text;
+   SearchIndexJsonText: Text;
    IsFirstSearchIndexItem: Boolean = true;
 
 type
@@ -381,6 +381,14 @@ var
       until Current = Document;
    end;
 
+   function MungeForJsonOutput(const Original: UTF8String): UTF8String;
+   begin
+      // Replace all `"` (#$22) with `\"` and also while we're at it, replace
+      // any newline (#$0A) with a space, and squash (DelSpace1) all sequences
+      // of multiple space into a single space.
+      Result := DelSpace1(StringReplace(StringReplace(Original, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
+   end;
+
    function MungeTopicToID(const Original: UTF8String): UTF8String;
    var
       IndexSource, IndexTarget: Cardinal;
@@ -690,24 +698,24 @@ var
                      begin
                         ID := Element.GetAttribute('id').AsString;
                         SectionNumber := Scratch.AsString;
-                        HeadingText := DelSpace1(StringReplace(StringReplace(Element.TextContent.AsString, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
+                        HeadingText := MungeForJsonOutput(Element.TextContent.AsString);
                         if (not IsFirstSearchIndexItem) then
-                           Write(SearchIndexJsonFile, ',');
+                           Write(SearchIndexJsonText, ',');
                         IsFirstSearchIndexItem := False;
-                        Write(SearchIndexJsonFile, '{');
-                        Write(SearchIndexJsonFile, '"url":"' + SplitFilename + '.html#' + ID + '",');
-                        Write(SearchIndexJsonFile, '"text":"' + HeadingText + '",');
+                        Write(SearchIndexJsonText, '{');
+                        Write(SearchIndexJsonText, '"url":"' + SplitFilename + '.html#' + ID + '",');
+                        Write(SearchIndexJsonText, '"text":"' + HeadingText + '",');
                         if (LastDelimiter('.', SectionNumber) <> 0) then
                         begin
                            ParentSectionNumber := Copy(SectionNumber, 1, LastDelimiter('.', SectionNumber) - 1);
                            ParentHeadingText := HeadingTextBySectionNumber[ParentSectionNumber];
-                           Write(SearchIndexJsonFile, '"section":"' + SectionNumber + ' ' + UTF8Encode(#$2014) + ' ' + ParentHeadingText + '"');
+                           Write(SearchIndexJsonText, '"section":"' + SectionNumber + ' ' + UTF8Encode(#$2014) + ' ' + ParentHeadingText + '"');
                         end
                         else
                         begin
-                           Write(SearchIndexJsonFile, '"section":"' + SectionNumber + '"');
+                           Write(SearchIndexJsonText, '"section":"' + SectionNumber + '"');
                         end;
-                        Write(SearchIndexJsonFile, '}');
+                        Write(SearchIndexJsonText, '}');
                         HeadingTextBySectionNumber[SectionNumber] := HeadingText;
                      end;
                      NewSpan := ConstructHTMLElement(eSpan);
@@ -719,27 +727,31 @@ var
                   else
                   begin
                      // TODO Find a more robust way to populate the search index
-                     // for this no-num backmatter stuff (Index, References,
-                     // Acknowledgments) because the below is brittle.
+                     // for this no-num backmatter sections (Index, References,
+                     // Acknowledgments) because the below is brittle. (It's
+                     // necessary to handle the backmatter sections differently
+                     // because they don't have section numbers, so we can't use
+                     // HeadingTextBySectionNumber to identify parent sections.)
                      if (Variant = vDEV) then
                      begin
                         ID := Element.GetAttribute('id').AsString;
-                        HeadingText := DelSpace1(StringReplace(StringReplace(Element.TextContent.AsString, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
-                        Write(SearchIndexJsonFile, ',{');
-                        Write(SearchIndexJsonFile, '"url": "' + SplitFilename + '.html#' + ID + '",');
-                        Write(SearchIndexJsonFile, '"text": "' + HeadingText + '",');
+                        HeadingText := MungeForJsonOutput(Element.TextContent.AsString);
+                        Write(SearchIndexJsonText, ',{');
+                        Write(SearchIndexJsonText, '"url": "' + SplitFilename + '.html#' + ID + '",');
+                        Write(SearchIndexJsonText, '"text": "' + HeadingText + '",');
                         // TODO Especially find a better way for this particular
                         // bit, given it'll break if there's a change to either
                         // the split-filename or id value for the Index section.
+                        // It's possible that LastTOCLI could help here.
                         if ((SplitFilename = 'indices') and (ID <> 'index')) then
                         begin
-                          Write(SearchIndexJsonFile, '"section": "' + ' ' + UTF8Encode(#$2014) + ' Index"');
+                          Write(SearchIndexJsonText, '"section": "' + ' ' + UTF8Encode(#$2014) + ' Index"');
                         end
                         else
                         begin
-                          Write(SearchIndexJsonFile, '"section": ""');
+                          Write(SearchIndexJsonText, '"section": ""');
                         end;
-                        Write(SearchIndexJsonFile, '}');
+                        Write(SearchIndexJsonText, '}');
                      end;
                   end;
                   if (Assigned(LastTOCOL) or Assigned(SmallTOC)) then
@@ -1284,15 +1296,12 @@ begin
          if (Variant = vDEV) then
          begin
             {$IFDEF DEBUG} Writeln('Adjusting headers, references, finding cross-references, creating search-index.json...'); {$ENDIF}
-            Assign(SearchIndexJsonFile, OutputDirectory + '/multipage-dev/search-index.json');
-            Rewrite(SearchIndexJsonFile);
-            Write(SearchIndexJsonFile, '[');
+            Assign(SearchIndexJsonText, OutputDirectory + '/multipage-dev/search-index.json');
+            Rewrite(SearchIndexJsonText);
+            Write(SearchIndexJsonText, '[');
             SecondPass();
-            try
-               Write(SearchIndexJsonFile, ']');
-               Close(SearchIndexJsonFile);
-            except
-            end;
+            Write(SearchIndexJsonText, ']');
+            Close(SearchIndexJsonText);
          end
          else
          begin
@@ -1325,7 +1334,7 @@ begin
                   if (Variant <> vDEV) then
                   begin
                      DFNAnchor := ID.AsString;
-                     SectionName := DelSpace1(StringReplace(StringReplace(CrossRefNode^.LastHeadingText, #$0A, ' ', [rfReplaceAll]), #$22, '\' + #$22, [rfReplaceAll]));
+                     SectionName := MungeForJsonOutput(CrossRefNode^.LastHeadingText);
                      Anchor := CrossRefNode^.SplitFilename.AsString + '.html#' + CrossRefNode^.Element.GetAttribute('id').AsString;
                      if (not XrefsByDFNAnchor.Has(DFNAnchor)) then
                      begin
