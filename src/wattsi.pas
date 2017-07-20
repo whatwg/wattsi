@@ -554,6 +554,12 @@ var
                        'Parent of first says: "' + DFNEntry.SubDFNElement.ParentNode.TextContent.AsString + '", parent of second says: "' + Element.ParentNode.TextContent.AsString + '"');
             end;
             DFNEntry.SubDFNElement := Element;
+
+            // Need to ensure an ID because it is normally only ensured for <dfn>s or elements that
+            // are cross-referenced at least once. But subdfns can be linked to from outside, so
+            // they need an ID even if they are not referenced. Additionally, the linkage to the
+            // caniuse annotations depends on the ID existing.
+            EnsureID(Element, MungeTopicToID(CrossReferenceName));
          end;
          SectionNumber := Default(Rope);
          for CurrentHeadingRank := 2 to LastHeadingRank do
@@ -1175,7 +1181,7 @@ var
                Container.InsertBefore(Status, Context);
             end;
 
-            if (Length(Feature.Bugs) > 0) then
+            if ((Length(Feature.Bugs) > 0) and (Variant <> vDEV)) then
             begin
                P := E(eP, ['class', 'bugs'], [E(eStrong, [T('Spec bugs:')]), T(' ')]);
                First := True;
@@ -1249,11 +1255,20 @@ var
          end
          else
          begin
-            Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
-            for Bug in Feature.Bugs do
-               Writeln('   ', Bug.URL);
+            if (Variant <> vDEV) then
+            begin
+               Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
+               for Bug in Feature.Bugs do
+                  Writeln('   ', Bug.URL);
+               if (Feature.CanIUseCode <> '') then
+                  Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
+            end
+            else
             if (Feature.CanIUseCode <> '') then
+            begin
+               Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
                Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
+            end;
          end;
       end;
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('END OF ANNOTATIONS'); {$ENDIF}
@@ -1404,9 +1419,9 @@ begin
          begin
             {$IFDEF DEBUG} Writeln('Writing xrefs.json...'); {$ENDIF}
             XrefsToJSON(XrefsByDFNAnchor);
-            {$IFDEF DEBUG} Writeln('Inserting annotations...'); {$ENDIF}
-            InsertAnnotations();
          end;
+         {$IFDEF DEBUG} Writeln('Inserting annotations...'); {$ENDIF}
+         InsertAnnotations();
          {$IFDEF DEBUG} Writeln('Inserting tables of contents...'); {$ENDIF}
          if (Assigned(BigTOCBookmark)) then
          begin
