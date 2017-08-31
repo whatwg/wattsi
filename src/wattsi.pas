@@ -983,7 +983,7 @@ var
                if (not References.Has(LastSeenReferenceName)) then
                begin
                   if (Variant <> vDEV) then
-                     Warn('Unused reference: [' + LastSeenReferenceName + ']');
+                     Fail('Unused reference: [' + LastSeenReferenceName + ']');
                   Result := False;
                end
             end
