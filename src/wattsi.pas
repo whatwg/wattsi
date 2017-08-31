@@ -1988,10 +1988,9 @@ begin
          LinkHome := LinkHome.ParentNode as TElement;
       until (not (LinkHome.ParentNode is TElement)) or LinkHome.IsIdentity(nsNone, eChapter);
       ExtractedData := LinkHome.GetAttribute(kFileNameAttribute);
-      if (ExtractedData.IsEmpty) then
-         FragmentLinks.Append(kIndexFilename)
-      else
+      if (not ExtractedData.IsEmpty) then
          FragmentLinks.AppendDestructively(ExtractedData);
+      // else the empty string
       FragmentLinks.Append($0022);
       Inc(TargetIndex);
    end;
@@ -2088,7 +2087,7 @@ begin
       Scratch.Append(@kTableOfContents[1], Length(kTableOfContents));
       Link.AppendChild(TText.CreateDestructively(Scratch));
       Scratch := Default(Rope);
-      Scratch.Append(kIndexFilename);
+      Scratch.Append('./');
       Link.SetAttributeDestructively('href', Scratch);
       LinkHome.AppendChild(Link);
       if (Assigned(CurrentSection.NextSibling)) then
