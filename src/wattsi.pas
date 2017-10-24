@@ -554,6 +554,17 @@ var
                        'Parent of first says: "' + DFNEntry.SubDFNElement.ParentNode.TextContent.AsString + '", parent of second says: "' + Element.ParentNode.TextContent.AsString + '"');
             end;
             DFNEntry.SubDFNElement := Element;
+
+            // Need to ensure an ID because it is normally only ensured for <dfn>s or elements that
+            // are cross-referenced at least once. But subdfns can be linked to from outside, so
+            // they need an ID even if they are not referenced. Additionally, the linkage to the
+            // caniuse annotations depends on the ID existing.
+            if (Variant <> vDEV) then
+               // If this isn't the dev edition, then we need to adjust the ID value to prevent the
+               // issue reported at https://github.com/whatwg/html-build/issues/121
+               EnsureID(Element, MungeTopicToID(CrossReferenceName + '-dev'))
+            else
+               EnsureID(Element, MungeTopicToID(CrossReferenceName));
          end;
          SectionNumber := Default(Rope);
          for CurrentHeadingRank := 2 to LastHeadingRank do
