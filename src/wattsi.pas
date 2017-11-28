@@ -1610,6 +1610,69 @@ begin
    NeededQuotes := qtNone;
 end;
 
+function ForceEscapeForJSON(constref Value: Rope): TWire;
+var
+   Enumerator: RopeEnumerator;
+begin
+   Result.Init();
+   Enumerator := RopeEnumerator.Create(@Value);
+   while (Enumerator.MoveNext()) do
+      case (Enumerator.Current.Value) of
+         $000A:
+            begin
+               Result.Append(Ord('\'));
+               Result.Append(Ord('n'));
+            end;
+         $0022:
+            begin
+               Result.Append(Ord('\'));
+               Result.Append(Ord('"'));
+            end;
+         $005C:
+            begin
+               Result.Append(Ord('\'));
+               Result.Append(Ord('\'));
+            end;
+         $0026:
+            begin
+               Result.Append(Ord('&'));
+               Result.Append(Ord('a'));
+               Result.Append(Ord('m'));
+               Result.Append(Ord('p'));
+               Result.Append(Ord(';'));
+            end;
+         $003C:
+            begin
+               Result.Append(Ord('&'));
+               Result.Append(Ord('l'));
+               Result.Append(Ord('t'));
+               Result.Append(Ord(';'));
+            end;
+      else
+         Result.Append(Enumerator.Current);
+      end;
+   Enumerator.Free();
+end;
+
+function EscapeForJSON(constref Value: Rope): UTF8String;
+var
+   Enumerator: RopeEnumerator;
+begin
+   Enumerator := RopeEnumerator.Create(@Value);
+   while (Enumerator.MoveNext()) do
+
+      case (Enumerator.Current.Value) of
+         $000A, $0022, $005C, $0026, $003C:
+            begin
+               Result := ForceEscapeForJSON(Value).AsString;
+               Enumerator.Free();
+               exit;
+            end;
+      end;
+   Enumerator.Free();
+   Result := Value.AsString;
+end;
+
 function ForceEscapeText(constref Value: Rope): TWire;
 var
    Enumerator: RopeEnumerator;
@@ -1668,6 +1731,8 @@ procedure Save(const Document: TDocument; const FileName: AnsiString; const InSp
 var
    F: Text;
    CurrentElement: TElement;
+   AsJSON, StartingNewJSONObject: Boolean;
+   JSONContents: UTF8String;
 
    function AutoclosedBy(const Before: TElement; const After: TNode): Boolean;
    begin
@@ -1766,9 +1831,15 @@ Result := False;
       end;
    end;
 
+   procedure WriteJSON(const JSONFragment: UTF8String);
+   begin
+      if (AsJSON) then
+         JSONContents := JSONContents + JSONFragment;
+   end;
+
    procedure WalkIn(const Element: TElement);
    var
-      IsExcluder, Skip: Boolean;
+      IsExcluder, Skip, NotFirstAttribute: Boolean;
       AttributeCount, Index: Cardinal;
       AttributeName, EscapedAttributeName, EscapedAttributeValue: UTF8String;
       Quotes: TQuoteType;
@@ -1777,8 +1848,14 @@ Result := False;
       IsExcluder := DetermineIsExcluder(Element, AttributeCount);
       if ((not IsExcluder) and ((AttributeCount > 0) or (not (Element.HasProperties(propOptionalStartTag) or SkippableTBodyStartTag(Element))))) then
       begin
-         Write(F, '<', Element.LocalName.AsString);
+         if (not StartingNewJSONObject) then
+            WriteJSON(',');
+         WriteJSON('["' + Element.LocalName.AsString + '"');
+         Write(F, '<' + Element.LocalName.AsString);
+         NotFirstAttribute := False;
          if (AttributeCount > 0) then
+         begin
+            WriteJSON(',{');
             for AttributeName in Element.Attributes do
             begin
                Skip := False;
@@ -1802,12 +1879,21 @@ Result := False;
                      if (EscapedAttributeName[Index] = ' ') then
                         EscapedAttributeName[Index] := ':';
                end;
+               if (NotFirstAttribute) then
+                  WriteJSON(',')
+               else
+                  NotFirstAttribute := True;
+               WriteJSON('"' + EscapedAttributeName + '": "' + EscapedAttributeValue + '"');
                case (Quotes) of
                   qtSingle: Write(F, ' ' + EscapedAttributeName + '=''' + EscapedAttributeValue + '''');
                   qtDouble: Write(F, ' ' + EscapedAttributeName + '="' + EscapedAttributeValue + '"');
                else Write(F, ' ' + EscapedAttributeName + '=' + EscapedAttributeValue);
                end;
             end;
+            WriteJSON('}');
+         end;
+         if (Element.HasProperties(propVoidElement)) then
+            WriteJSON(']');
          Write(F, '>');
       end;
       CurrentElement := Element;
@@ -1824,7 +1910,8 @@ Result := False;
       if (not (IsExcluder or Element.HasProperties(propVoidElement) or
                (Element.HasProperties(propOptionalEndTag) and ((not Assigned(Element.NextSibling)) or (AutoclosedBy(Element, Element.NextSibling)))))) then
       begin
-         Write(F, '</', Element.LocalName.AsString, '>');
+         WriteJSON(']');
+         Write(F, '</' + Element.LocalName.AsString + '>');
       end;
       if (Element.ParentNode is TElement) then
          CurrentElement := TElement(Element.ParentNode)
@@ -1840,8 +1927,11 @@ begin
    Write(F, '<!DOCTYPE html>');
    Current := Document.DocumentElement;
    CurrentElement := nil;
+   AsJSON := False;
+   JSONContents := '';
    repeat
       Assert(Assigned(Current));
+      StartingNewJSONObject := False;
       if (Current is TElement) then
       begin
          if (InSplit and TElement(Current).HasAttribute(kExcludingAttribute[vSplit])) then
@@ -1856,10 +1946,18 @@ begin
       if (Current is TText) then
       begin
          Assert(Assigned(CurrentElement));
+         WriteJSON(',"');
          if (CurrentElement.HasProperties(propRawTextElement)) then
-            Write(F, TText(Current).Data.AsString)
+         begin
+            WriteJSON(EscapeForJSON(TText(Current).Data).AsString);
+            Write(F, TText(Current).Data.AsString);
+         end
          else
+         begin
+            WriteJSON(EscapeForJSON(TText(Current).Data).AsString);
             Write(F, EscapeText(TText(Current).Data).AsString);
+         end;
+         WriteJSON('"');
       end;
       if (not WalkToNext(Current, Document, @WalkOut)) then
          break;
