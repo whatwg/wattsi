@@ -1733,6 +1733,7 @@ var
    CurrentElement: TElement;
    AsJSON, StartingNewJSONObject: Boolean;
    JSONContents: UTF8String;
+   HTMLContents: UTF8String;
 
    function AutoclosedBy(const Before: TElement; const After: TNode): Boolean;
    begin
@@ -1837,6 +1838,14 @@ Result := False;
          JSONContents := JSONContents + JSONFragment;
    end;
 
+   procedure WriteHTML(const HTMLFragment: UTF8String);
+   begin
+      if (AsJSON) then
+         HTMLContents := HTMLContents + HTMLFragment
+      else
+         Write(F, HTMLFragment);
+   end;
+
    procedure WalkIn(const Element: TElement);
    var
       IsExcluder, Skip, NotFirstAttribute: Boolean;
@@ -1851,7 +1860,7 @@ Result := False;
          if (not StartingNewJSONObject) then
             WriteJSON(',');
          WriteJSON('["' + Element.LocalName.AsString + '"');
-         Write(F, '<' + Element.LocalName.AsString);
+         WriteHTML('<' + Element.LocalName.AsString);
          NotFirstAttribute := False;
          if (AttributeCount > 0) then
          begin
@@ -1885,16 +1894,16 @@ Result := False;
                   NotFirstAttribute := True;
                WriteJSON('"' + EscapedAttributeName + '": "' + EscapedAttributeValue + '"');
                case (Quotes) of
-                  qtSingle: Write(F, ' ' + EscapedAttributeName + '=''' + EscapedAttributeValue + '''');
-                  qtDouble: Write(F, ' ' + EscapedAttributeName + '="' + EscapedAttributeValue + '"');
-               else Write(F, ' ' + EscapedAttributeName + '=' + EscapedAttributeValue);
+                  qtSingle: WriteHTML(' ' + EscapedAttributeName + '=''' + EscapedAttributeValue + '''');
+                  qtDouble: WriteHTML(' ' + EscapedAttributeName + '="' + EscapedAttributeValue + '"');
+               else WriteHTML(' ' + EscapedAttributeName + '=' + EscapedAttributeValue);
                end;
             end;
             WriteJSON('}');
          end;
          if (Element.HasProperties(propVoidElement)) then
             WriteJSON(']');
-         Write(F, '>');
+         WriteHTML('>');
       end;
       CurrentElement := Element;
    end;
@@ -1911,7 +1920,7 @@ Result := False;
                (Element.HasProperties(propOptionalEndTag) and ((not Assigned(Element.NextSibling)) or (AutoclosedBy(Element, Element.NextSibling)))))) then
       begin
          WriteJSON(']');
-         Write(F, '</' + Element.LocalName.AsString + '>');
+         WriteHTML('</' + Element.LocalName.AsString + '>');
       end;
       if (Element.ParentNode is TElement) then
          CurrentElement := TElement(Element.ParentNode)
@@ -1924,11 +1933,12 @@ var
 begin
    Assign(F, FileName);
    Rewrite(F);
-   Write(F, '<!DOCTYPE html>');
+   WriteHTML('<!DOCTYPE html>');
    Current := Document.DocumentElement;
    CurrentElement := nil;
    AsJSON := False;
    JSONContents := '';
+   HTMLContents := '';
    repeat
       Assert(Assigned(Current));
       StartingNewJSONObject := False;
@@ -1950,12 +1960,12 @@ begin
          if (CurrentElement.HasProperties(propRawTextElement)) then
          begin
             WriteJSON(EscapeForJSON(TText(Current).Data).AsString);
-            Write(F, TText(Current).Data.AsString);
+            WriteHTML(TText(Current).Data.AsString);
          end
          else
          begin
             WriteJSON(EscapeForJSON(TText(Current).Data).AsString);
-            Write(F, EscapeText(TText(Current).Data).AsString);
+            WriteHTML(EscapeText(TText(Current).Data).AsString);
          end;
          WriteJSON('"');
       end;
