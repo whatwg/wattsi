@@ -869,6 +869,21 @@ var
             end;
          end
          else
+         if ((Element.IsIdentity(nsHTML, eSpan)) and (Element.GetAttribute('class').AsString = 'pubyear')) then
+         begin
+            if ((not Element.HasChildNodes()) or (not (Element.FirstChild is TText))) then
+            begin
+               Fail('pubyear span must contain exactly one text node');
+            end
+            else
+            begin
+               Scratch := Default(Rope);
+               DecodeDate(Date, TodayYear, TodayMonth, TodayDay);
+               Scratch.Append(IntToStr(TodayYear));
+               TText(Element.FirstChild).Data := Scratch;
+            end;
+         end
+         else
          if (Element.IsIdentity(nsHTML, eDFN)) then
          begin
             if (Element.HasAttribute(kLTAttribute)) then
