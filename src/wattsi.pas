@@ -850,26 +850,38 @@ var
             end;
          end
          else
-         if ((Element.IsIdentity(nsHTML, eSpan)) and ((Element.GetAttribute('class').AsString = 'pubdate') or (Element.GetAttribute('class').AsString = 'pubyear'))) then
+         if (Element.IsIdentity(nsHTML, eSpan)) then
          begin
             ClassName := Element.GetAttribute('class').AsString;
-            if ((not Element.HasChildNodes()) or (not (Element.FirstChild is TText))) then
+            if ((ClassName = 'pubdate') or (ClassName = 'pubyear')) then
             begin
-               Fail(ClassName + ' span must contain exactly one text node');
+               if ((not Element.HasChildNodes()) or (not (Element.FirstChild is TText))) then
+               begin
+                  Fail(ClassName + ' span must contain exactly one text node');
+               end
+               else
+               begin
+                  Scratch := Default(Rope);
+                  DecodeDate(Date, TodayYear, TodayMonth, TodayDay);
+                  if (ClassName = 'pubdate') then
+                  begin
+                     Scratch.Append(IntToStr(TodayDay));
+                     Scratch.Append($0020);
+                     Scratch.Append(@Months[TodayMonth][1], Length(Months[TodayMonth])); // $R-
+                     Scratch.Append($0020);
+                  end;
+                  Scratch.Append(IntToStr(TodayYear));
+                  TText(Element.FirstChild).Data := Scratch;
+               end;
             end
             else
             begin
-               Scratch := Default(Rope);
-               DecodeDate(Date, TodayYear, TodayMonth, TodayDay);
-               if(ClassName = 'pubdate') then
-               begin
-                   Scratch.Append(IntToStr(TodayDay));
-                   Scratch.Append($0020);
-                   Scratch.Append(@Months[TodayMonth][1], Length(Months[TodayMonth])); // $R-
-                   Scratch.Append($0020);
-               end;
-               Scratch.Append(IntToStr(TodayYear));
-               TText(Element.FirstChild).Data := Scratch;
+               if (Element.HasAttribute(kLTAttribute)) then
+                  Fail('<span> with lt="" found, use data-x="" instead; span is ' + Describe(Element));
+               if (Assigned(InDFN)) then
+                  Fail('<span> inside <dfn>; span is ' + Describe(Element))
+               else
+                  SaveCrossReference(Element);
             end;
          end
          else
@@ -922,16 +934,6 @@ var
          if (Element.IsIdentity(nsHTML, ePre) and (Element.GetAttribute('class').AsString = 'idl') and (Variant = vDEV)) then
          begin
             Result := False;
-         end
-         else
-         if (Element.IsIdentity(nsHTML, eSpan)) then
-         begin
-            if (Element.HasAttribute(kLTAttribute)) then
-               Fail('<span> with lt="" found, use data-x="" instead; span is ' + Describe(Element));
-            if (Assigned(InDFN)) then
-               Fail('<span> inside <dfn>; span is ' + Describe(Element))
-            else
-               SaveCrossReference(Element);
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (not Element.HasAttribute(kHrefAttribute))) then
