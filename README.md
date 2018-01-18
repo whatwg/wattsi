@@ -1,6 +1,6 @@
 # Wattsi
 
-Wattsi is a build tool for creating the [HTML Standard](http://html.spec.whatwg.org/multipage/) from its [source](https://github.com/whatwg/html). It works in concert with [other scripts](https://github.com/whatwg/html-build).
+Wattsi is a build tool for creating the [HTML Standard](https://html.spec.whatwg.org/multipage/) from its [source](https://github.com/whatwg/html). It works in concert with [other scripts](https://github.com/whatwg/html-build).
 
 ## Features
 
@@ -15,7 +15,7 @@ Currently:
 
 ## Building
 
-Wattsi is written in [Free Pascal](http://www.freepascal.org/), and uses features from the latest release candidate versions. You'll need to install the 3.0.0 FreePascal compiler from ftp://freepascal.stack.nl/pub/fpc/dist/3.0.0/ to build it. With that installed, you should be able to run `./build.sh` to create the wattsi executable and supporting shared libraries.
+Wattsi is written in [Free Pascal](https://www.freepascal.org/), and uses features from the latest release candidate versions. You'll need to install the [3.0.0 FreePascal compiler](https://www.freepascal.org/download.var) from to build it. With that installed, you should be able to run `./build.sh` to create the wattsi executable and supporting shared libraries.
 
 We hope to in the future provide precompiled wattsi binaries, built via continuous integration, for Wattsi. If you think you can help with this, please file an issue to get the discussion started! In the meantime, we do provide the [wattsi-server](https://github.com/domenic/wattsi-server) service, which allows you to upload files to a server that will run Wattsi for you.
 
