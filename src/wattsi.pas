@@ -883,13 +883,13 @@ var
             end;
          end
          else
-         if (Element.IsIdentity(nsHTML, eTITLE)) and (Variant = vSnap) then
+         if (Element.IsIdentity(nsHTML, eTitle)) and (Variant = vSnap) then
          begin
+            Element.AppendChild(TText.Create(' (Commit Snapshot '));
             Scratch := Default(Rope);
-            // TODO fix types Scratch.Append(TText(Element.FirstChild).Data);
-            Scratch.Append($0020);
-            Scratch.Append(SourceGitSHA);
-            TText(Element.FirstChild).Data := Scratch;
+            Scratch.Append(@SourceGitSHA[1], Length(SourceGitSHA));
+            Element.AppendChild(TText.CreateDestructively(Scratch));
+            Element.AppendChild(TText.Create(')'));
          end
          else
          if (Element.IsIdentity(nsHTML, eDFN)) then
