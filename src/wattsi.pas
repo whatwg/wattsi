@@ -602,13 +602,11 @@ var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
       Element, HeadingSelfLink, NewLI, SecondLI, NewLink, NewP, NewI, NewSpan, TempElement: TElement;
-      Scratch, ImageSrc: Rope;
+      Scratch: Rope;
       ExtractedData: CutRope;
-      ClassName, Instruction, CrossReferenceName, Revision, ReferenceName: UTF8String;
-      Index: Cardinal;
+      ClassName, Instruction, CrossReferenceName, ReferenceName: UTF8String;
       TodayYear, TodayMonth, TodayDay: Word;
-      InSkippedNode, Matching, UsedLI: Boolean;
-      Enumerator: RopeEnumerator;
+      InSkippedNode, UsedLI: Boolean;
       ListNode: PElementListNode;
       DFNEntry: TDFNEntry;
       ID, HeadingText, ParentHeadingText, SectionNumber, ParentSectionNumber: UTF8String;
