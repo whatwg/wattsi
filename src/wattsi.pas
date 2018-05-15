@@ -52,12 +52,12 @@ var
    IsFirstSearchIndexItem: Boolean = true;
 
 type
-   TAllVariants = (vHTML, vDEV, vSplit);
-   TVariants = vHTML..vDEV;
+   TAllVariants = (vHTML, vDEV, vSnap, vSplit);
+   TVariants = vHTML..vSnap;
 
 const
-   kSuffixes: array[TVariants] of UTF8String = ('html', 'dev');
-   kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosplit');
+   kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap');
+   kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosnap', 'w-nosplit');
    kCrossRefAttribute = 'data-x';
    kCrossSpecRefAttribute = 'data-x-href';
    kCrossRefInternalLinkAttribute = 'data-x-internal';
@@ -121,7 +121,7 @@ var
    Browsers: array[TBrowserIndex] of TBrowser;
    Features: TFeatureMap;
 
-procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement);
+procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement; const SourceGitSHA: AnsiString);
 type
    PElementListNode = ^TElementListNode;
    TElementListNode = record
@@ -881,6 +881,15 @@ var
                else
                   SaveCrossReference(Element);
             end;
+         end
+         else
+         if (Element.IsIdentity(nsHTML, eTITLE)) and (Variant = vSnap) then
+         begin
+            Scratch := Default(Rope);
+            // TODO fix types Scratch.Append(TText(Element.FirstChild).Data);
+            Scratch.Append($0020);
+            Scratch.Append(SourceGitSHA);
+            TText(Element.FirstChild).Data := Scratch;
          end
          else
          if (Element.IsIdentity(nsHTML, eDFN)) then
@@ -2507,6 +2516,7 @@ const
 var
    ParamOffset: Integer = 0;
    SourceFile: AnsiString;
+   SourceGitSHA: AnsiString;
    Source: TFileData;
    Parser: THTMLParser;
    BigTOC: TElement;
@@ -2515,8 +2525,8 @@ var
    Variant: TAllVariants;
 begin
    Result := False;
-   if (ParamCount() <> 4) then
-      if ((ParamCount() = 5) and (ParamStr(1) = '--quiet')) then
+   if (ParamCount() <> 5) then
+      if ((ParamCount() = 6) and (ParamStr(1) = '--quiet')) then
       begin
          Quiet := true;
          ParamOffset := 1;
@@ -2531,12 +2541,13 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
+         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <caniuse.json> <bugs.csv>');
          Writeln('  wattsi --version');
          exit;
       end;
    SourceFile := ParamStr(1 + ParamOffset);
-   OutputDirectory := ParamStr(2 + ParamOffset);
+   SourceGitSHA := ParamStr(2 + ParamOffset);
+   OutputDirectory := ParamStr(3 + ParamOffset);
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -2546,8 +2557,8 @@ begin
    end;
    Features := TFeatureMap.Create(@UTF8StringHash32);
    try
-      PreProcessCanIUseData(ParamStr(3 + ParamOffset));
-      PreProcessBugsData(ParamStr(4 + ParamOffset));
+      PreProcessCanIUseData(ParamStr(4 + ParamOffset));
+      PreProcessBugsData(ParamStr(5 + ParamOffset));
       {$IFDEF VERBOSE_PREPROCESSORS}
          if (Assigned(Features)) then
             for ID in Features do
@@ -2602,10 +2613,15 @@ begin
                // gen...
                for Variant in TVariants do
                begin
-                  MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
+                  // Create this directory early as ProcessDocument relies on it to store
+                  // /multipage-dev/search-index.json
+                  if (Variant <> vSnap) then
+                  begin
+                     MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
+                  end;
                   Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
                   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                  ProcessDocument(Documents[Variant], Variant, BigTOC); // $R-
+                  ProcessDocument(Documents[Variant], Variant, BigTOC, SourceGitSHA); // $R-
                   {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
                   // output...
                   if (Variant <> vDEV) then
@@ -2616,11 +2632,14 @@ begin
                      {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
                   end;
                   // multipage...
-                  {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
-                  {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
-                     raise EAbort.Create('Could not split specification');
-                  {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                  if (Variant <> vSnap) then
+                  begin
+                     {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
+                     {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                     if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
+                        raise EAbort.Create('Could not split specification');
+                     {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                  end;
                end;
                Result := True;
             except
