@@ -58,6 +58,7 @@ type
 const
    kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap');
    kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosnap', 'w-nosplit');
+   kDEVAttribute = 'w-dev';
    kCrossRefAttribute = 'data-x';
    kCrossSpecRefAttribute = 'data-x-href';
    kCrossRefInternalLinkAttribute = 'data-x-internal';
@@ -322,7 +323,9 @@ var
       repeat
          if (Current is TElement) then
          begin
-            if (TElement(Current).HasAttribute(kExcludingAttribute[Variant])) then
+            if ((TElement(Current).HasAttribute(kExcludingAttribute[Variant])) or
+                ((Variant <> vDEV) and
+                 (TElement(Current).HasAttribute(kDEVAttribute)))) then
             begin
                DropNode();
                continue;
@@ -941,6 +944,18 @@ var
          if (Element.IsIdentity(nsHTML, ePre) and (Element.GetAttribute('class').AsString = 'idl') and (Variant = vDEV)) then
          begin
             Result := False;
+         end
+         else
+         if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('class').AsString = 'sha-link') and (Variant = vSnap)) then
+         begin
+            Scratch := Default(Rope);
+            Scratch.Append(@SourceGitSHA[1], Length(SourceGitSHA));
+            Element.AppendChild(TText.CreateDestructively(Scratch));
+            Element.AppendChild(TText.Create(' commit'));
+            Scratch := Default(Rope);
+            Scratch.Append('https://github.com/whatwg/html/commit/');
+            Scratch.Append(@SourceGitSHA[1], Length(SourceGitSHA));
+            Element.SetAttributeDestructively('href', Scratch);
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (not Element.HasAttribute(kHrefAttribute))) then
@@ -1766,7 +1781,8 @@ Result := False;
                for Variant in TAllVariants do
                   if (AttributeName = kExcludingAttribute[Variant]) then
                      Skip := True;
-               if (Skip or (AttributeName = kCrossRefAttribute) or
+               if (Skip or (AttributeName = kDEVAttribute) or
+                           (AttributeName = kCrossRefAttribute) or
                            (AttributeName = kSubDFNAttribute) or
                            (AttributeName = kCrossSpecRefAttribute) or
                            (AttributeName = kUndefinedAttribute) or
