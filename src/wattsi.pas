@@ -52,12 +52,12 @@ var
    IsFirstSearchIndexItem: Boolean = true;
 
 type
-   TAllVariants = (vHTML, vDEV, vSnap, vSplit);
-   TVariants = vHTML..vSnap;
+   TAllVariants = (vHTML, vDEV, vSnap, vReview, vSplit);
+   TVariants = vHTML..vReview;
 
 const
-   kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap');
-   kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosnap', 'w-nosplit');
+   kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap', 'review');
+   kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosnap', 'w-noreview', 'w-nosplit');
    kDEVAttribute = 'w-dev';
    kCrossRefAttribute = 'data-x';
    kCrossSpecRefAttribute = 'data-x-href';
@@ -888,6 +888,7 @@ var
             end;
          end
          else
+         // For vReview the title is already taken care of
          if (Element.IsIdentity(nsHTML, eTitle)) and (Variant = vSnap) then
          begin
             Element.AppendChild(TText.Create(' (Commit Snapshot '));
@@ -2529,6 +2530,7 @@ var
    ParamOffset: Integer = 0;
    SourceFile: AnsiString;
    SourceGitSHA: AnsiString;
+   BuildType: AnsiString;
    Source: TFileData;
    Parser: THTMLParser;
    BigTOC: TElement;
@@ -2537,8 +2539,8 @@ var
    Variant: TAllVariants;
 begin
    Result := False;
-   if (ParamCount() <> 5) then
-      if ((ParamCount() = 6) and (ParamStr(1) = '--quiet')) then
+   if (ParamCount() <> 6) then
+      if ((ParamCount() = 7) and (ParamStr(1) = '--quiet')) then
       begin
          Quiet := true;
          ParamOffset := 1;
@@ -2553,13 +2555,14 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <caniuse.json> <bugs.csv>');
+         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <bugs.csv>');
          Writeln('  wattsi --version');
          exit;
       end;
    SourceFile := ParamStr(1 + ParamOffset);
    SourceGitSHA := ParamStr(2 + ParamOffset);
    OutputDirectory := ParamStr(3 + ParamOffset);
+   BuildType := ParamStr(4 + ParamOffset);
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -2569,8 +2572,8 @@ begin
    end;
    Features := TFeatureMap.Create(@UTF8StringHash32);
    try
-      PreProcessCanIUseData(ParamStr(4 + ParamOffset));
-      PreProcessBugsData(ParamStr(5 + ParamOffset));
+      PreProcessCanIUseData(ParamStr(5 + ParamOffset));
+      PreProcessBugsData(ParamStr(6 + ParamOffset));
       {$IFDEF VERBOSE_PREPROCESSORS}
          if (Assigned(Features)) then
             for ID in Features do
@@ -2623,37 +2626,52 @@ begin
          try
             try
                // gen...
-               for Variant in TVariants do
+               if (BuildType = 'default') then
                begin
-                  // Create this directory early as ProcessDocument relies on it to store
-                  // /multipage-dev/search-index.json
-                  if (Variant <> vSnap) then
+                  for Variant in TVariants do
                   begin
-                     MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
-                  end;
-                  Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
-                  {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                  ProcessDocument(Documents[Variant], Variant, BigTOC, SourceGitSHA); // $R-
-                  {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-                  // output...
-                  if (Variant <> vDEV) then
-                  begin
-                     {$IFDEF TIMINGS} Writeln('Saving single-page version...'); {$ENDIF}
+                     if (Variant = vReview) then
+                     begin
+                        continue;
+                     end;
+                     // Create this directory early as ProcessDocument relies on it to store
+                     // /multipage-dev/search-index.json
+                     if (Variant <> vSnap) then
+                     begin
+                        MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
+                     end;
+                     Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
                      {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                     Save(Documents[Variant], OutputDirectory + '/index-' + kSuffixes[Variant]);
+                     ProcessDocument(Documents[Variant], Variant, BigTOC, SourceGitSHA); // $R-
                      {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                     // output...
+                     if (Variant <> vDEV) then
+                     begin
+                        {$IFDEF TIMINGS} Writeln('Saving single-page version...'); {$ENDIF}
+                        {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                        Save(Documents[Variant], OutputDirectory + '/index-' + kSuffixes[Variant]);
+                        {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                     end;
+                     // multipage...
+                     if (Variant <> vSnap) then
+                     begin
+                        {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
+                        {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                        if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
+                           raise EAbort.Create('Could not split specification');
+                        {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                     end;
                   end;
-                  // multipage...
-                  if (Variant <> vSnap) then
-                  begin
-                     {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
-                     {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                     if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
-                        raise EAbort.Create('Could not split specification');
-                     {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-                  end;
+                  Result := True;
+               end
+               else
+               begin
+                  Assert(BuildType = 'review');
+                  // Skip timing information here as it should be roughly equivalent
+                  Inform('Generating ' + Uppercase(kSuffixes[vReview]) + ' exclusively...');
+                  ProcessDocument(Documents[vReview], vReview, BigTOC, SourceGitSHA);
+                  Save(Documents[vReview], OutputDirectory + '/index-' + kSuffixes[vReview]);
                end;
-               Result := True;
             except
                on E: EAbort do
                   Writeln('Aborting.');
