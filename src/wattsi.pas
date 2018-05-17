@@ -601,6 +601,8 @@ var
    end;
 
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
+   const
+      SourceGitSHALink: AnsiString = '';
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
@@ -889,9 +891,7 @@ var
          if (Element.IsIdentity(nsHTML, eTitle)) and (Variant = vSnap) then
          begin
             Element.AppendChild(TText.Create(' (Commit Snapshot '));
-            Scratch := Default(Rope);
-            Scratch.Append(@SourceGitSHA[1], Length(SourceGitSHA));
-            Element.AppendChild(TText.CreateDestructively(Scratch));
+            Element.AppendChild(TText.Create(SourceGitSHA));
             Element.AppendChild(TText.Create(')'));
          end
          else
@@ -948,14 +948,10 @@ var
          else
          if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('class').AsString = 'sha-link') and (Variant = vSnap)) then
          begin
-            Scratch := Default(Rope);
-            Scratch.Append(@SourceGitSHA[1], Length(SourceGitSHA));
-            Element.AppendChild(TText.CreateDestructively(Scratch));
+            Element.AppendChild(TText.Create(SourceGitSHA));
             Element.AppendChild(TText.Create(' commit'));
-            Scratch := Default(Rope);
-            Scratch.Append('https://github.com/whatwg/html/commit/');
-            Scratch.Append(@SourceGitSHA[1], Length(SourceGitSHA));
-            Element.SetAttributeDestructively('href', Scratch);
+            SourceGitSHALink := 'https://github.com/whatwg/html/commit/' + SourceGitSHA;
+            Element.SetAttribute('href', SourceGitSHALink);
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (not Element.HasAttribute(kHrefAttribute))) then
