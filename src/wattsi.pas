@@ -602,7 +602,7 @@ var
 
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
    const
-      SourceGitSHALink: AnsiString = '';
+      SourceGitBaseURL: AnsiString = 'https://github.com/whatwg/html/commit/';
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
@@ -951,8 +951,10 @@ var
          begin
             Element.AppendChild(TText.Create(SourceGitSHA));
             Element.AppendChild(TText.Create(' commit'));
-            SourceGitSHALink := 'https://github.com/whatwg/html/commit/' + SourceGitSHA;
-            Element.SetAttribute('href', SourceGitSHALink);
+            Scratch := Default(Rope);
+            Scratch.Append(@SourceGitBaseURL);
+            Scratch.Append(@SourceGitSHA);
+            Element.SetAttributeDestructively('href', Scratch);
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (not Element.HasAttribute(kHrefAttribute))) then
