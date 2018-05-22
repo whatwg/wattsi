@@ -2620,11 +2620,14 @@ begin
             Parser.Free();
          end;
          {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-         {$IFDEF TIMINGS} Writeln('Cloning...'); {$ENDIF}
-         {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-         for Variant in OtherVariants do
-            Documents[Variant] := Documents[Low(TVariants)].CloneNode(True);
-         {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+         if (BuildType = 'default') then
+         begin
+            {$IFDEF TIMINGS} Writeln('Cloning...'); {$ENDIF}
+            {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+            for Variant in OtherVariants do
+               Documents[Variant] := Documents[Low(TVariants)].CloneNode(True);
+            {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+         end;
          try
             try
                // gen...
@@ -2670,8 +2673,8 @@ begin
                   Assert(BuildType = 'review');
                   // Skip timing information here as it should be roughly equivalent
                   Inform('Generating ' + Uppercase(kSuffixes[vReview]) + ' exclusively...');
-                  ProcessDocument(Documents[vReview], vReview, BigTOC, SourceGitSHA);
-                  Save(Documents[vReview], OutputDirectory + '/index-' + kSuffixes[vReview]);
+                  ProcessDocument(Documents[Low(TVariants)], vReview, BigTOC, SourceGitSHA);
+                  Save(Documents[Low(TVariants)], OutputDirectory + '/index-' + kSuffixes[vReview]);
                end;
                Result := True;
             except
@@ -2684,8 +2687,15 @@ begin
             end;
          finally
             try
-               for Variant in TVariants do
-                  Documents[Variant].Free();
+               if (BuildType = 'default') then
+               begin
+                  for Variant in TVariants do
+                     Documents[Variant].Free();
+               end
+               else
+               begin
+                  Documents[Low(TVariants)].Free();
+               end;
             except
                ReportCurrentException();
             end;
