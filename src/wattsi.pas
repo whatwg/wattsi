@@ -2664,7 +2664,6 @@ begin
                         {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
                      end;
                   end;
-                  Result := True;
                end
                else
                begin
@@ -2674,6 +2673,7 @@ begin
                   ProcessDocument(Documents[vReview], vReview, BigTOC, SourceGitSHA);
                   Save(Documents[vReview], OutputDirectory + '/index-' + kSuffixes[vReview]);
                end;
+               Result := True;
             except
                on E: EAbort do
                   Writeln('Aborting.');
