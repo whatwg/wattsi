@@ -1,0 +1,9 @@
+language: c
+sudo: false
+
+env: FPCDIR=${HOME}/fpc
+
+# install fpc
+install: .travis/fpcup.sh || cat ${HOME}/fpcup.log
+
+./build.sh
