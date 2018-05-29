@@ -52,12 +52,13 @@ var
    IsFirstSearchIndexItem: Boolean = true;
 
 type
-   TAllVariants = (vHTML, vDEV, vSplit);
-   TVariants = vHTML..vDEV;
+   TAllVariants = (vHTML, vDEV, vSnap, vReview, vSplit);
+   TVariants = vHTML..vReview;
 
 const
-   kSuffixes: array[TVariants] of UTF8String = ('html', 'dev');
-   kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosplit');
+   kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap', 'review');
+   kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosnap', 'w-noreview', 'w-nosplit');
+   kDEVAttribute = 'w-dev';
    kCrossRefAttribute = 'data-x';
    kCrossSpecRefAttribute = 'data-x-href';
    kCrossRefInternalLinkAttribute = 'data-x-internal';
@@ -121,7 +122,7 @@ var
    Browsers: array[TBrowserIndex] of TBrowser;
    Features: TFeatureMap;
 
-procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement);
+procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement; const SourceGitSHA: AnsiString);
 type
    PElementListNode = ^TElementListNode;
    TElementListNode = record
@@ -322,7 +323,9 @@ var
       repeat
          if (Current is TElement) then
          begin
-            if (TElement(Current).HasAttribute(kExcludingAttribute[Variant])) then
+            if ((TElement(Current).HasAttribute(kExcludingAttribute[Variant])) or
+                ((Variant <> vDEV) and
+                 (TElement(Current).HasAttribute(kDEVAttribute)))) then
             begin
                DropNode();
                continue;
@@ -598,6 +601,8 @@ var
    end;
 
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
+   const
+      SourceGitBaseURL: AnsiString = 'https://github.com/whatwg/html/commit/';
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
@@ -883,6 +888,14 @@ var
             end;
          end
          else
+         // For vReview the title is already taken care of
+         if (Element.IsIdentity(nsHTML, eTitle)) and (Variant = vSnap) then
+         begin
+            Element.AppendChild(TText.Create(' (Commit Snapshot '));
+            Element.AppendChild(TText.Create(SourceGitSHA));
+            Element.AppendChild(TText.Create(')'));
+         end
+         else
          if (Element.IsIdentity(nsHTML, eDFN)) then
          begin
             if (Element.HasAttribute(kLTAttribute)) then
@@ -932,6 +945,16 @@ var
          if (Element.IsIdentity(nsHTML, ePre) and (Element.GetAttribute('class').AsString = 'idl') and (Variant = vDEV)) then
          begin
             Result := False;
+         end
+         else
+         if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('class').AsString = 'sha-link') and (Variant = vSnap)) then
+         begin
+            Element.AppendChild(TText.Create(SourceGitSHA));
+            Element.AppendChild(TText.Create(' commit'));
+            Scratch := Default(Rope);
+            Scratch.Append(@SourceGitBaseURL);
+            Scratch.Append(@SourceGitSHA);
+            Element.SetAttributeDestructively('href', Scratch);
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (not Element.HasAttribute(kHrefAttribute))) then
@@ -1757,7 +1780,8 @@ Result := False;
                for Variant in TAllVariants do
                   if (AttributeName = kExcludingAttribute[Variant]) then
                      Skip := True;
-               if (Skip or (AttributeName = kCrossRefAttribute) or
+               if (Skip or (AttributeName = kDEVAttribute) or
+                           (AttributeName = kCrossRefAttribute) or
                            (AttributeName = kSubDFNAttribute) or
                            (AttributeName = kCrossSpecRefAttribute) or
                            (AttributeName = kUndefinedAttribute) or
@@ -2507,6 +2531,8 @@ const
 var
    ParamOffset: Integer = 0;
    SourceFile: AnsiString;
+   SourceGitSHA: AnsiString;
+   BuildType: AnsiString;
    Source: TFileData;
    Parser: THTMLParser;
    BigTOC: TElement;
@@ -2515,8 +2541,8 @@ var
    Variant: TAllVariants;
 begin
    Result := False;
-   if (ParamCount() <> 4) then
-      if ((ParamCount() = 5) and (ParamStr(1) = '--quiet')) then
+   if (ParamCount() <> 6) then
+      if ((ParamCount() = 7) and (ParamStr(1) = '--quiet')) then
       begin
          Quiet := true;
          ParamOffset := 1;
@@ -2531,12 +2557,14 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <output-directory> <caniuse.json> <bugs.csv>');
+         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <bugs.csv>');
          Writeln('  wattsi --version');
          exit;
       end;
    SourceFile := ParamStr(1 + ParamOffset);
-   OutputDirectory := ParamStr(2 + ParamOffset);
+   SourceGitSHA := ParamStr(2 + ParamOffset);
+   OutputDirectory := ParamStr(3 + ParamOffset);
+   BuildType := ParamStr(4 + ParamOffset);
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -2546,8 +2574,8 @@ begin
    end;
    Features := TFeatureMap.Create(@UTF8StringHash32);
    try
-      PreProcessCanIUseData(ParamStr(3 + ParamOffset));
-      PreProcessBugsData(ParamStr(4 + ParamOffset));
+      PreProcessCanIUseData(ParamStr(5 + ParamOffset));
+      PreProcessBugsData(ParamStr(6 + ParamOffset));
       {$IFDEF VERBOSE_PREPROCESSORS}
          if (Assigned(Features)) then
             for ID in Features do
@@ -2592,35 +2620,61 @@ begin
             Parser.Free();
          end;
          {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-         {$IFDEF TIMINGS} Writeln('Cloning...'); {$ENDIF}
-         {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-         for Variant in OtherVariants do
-            Documents[Variant] := Documents[Low(TVariants)].CloneNode(True);
-         {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+         if (BuildType = 'default') then
+         begin
+            {$IFDEF TIMINGS} Writeln('Cloning...'); {$ENDIF}
+            {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+            for Variant in OtherVariants do
+               Documents[Variant] := Documents[Low(TVariants)].CloneNode(True);
+            {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+         end;
          try
             try
                // gen...
-               for Variant in TVariants do
+               if (BuildType = 'default') then
                begin
-                  MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
-                  Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
-                  {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                  ProcessDocument(Documents[Variant], Variant, BigTOC); // $R-
-                  {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-                  // output...
-                  if (Variant <> vDEV) then
+                  for Variant in TVariants do
                   begin
-                     {$IFDEF TIMINGS} Writeln('Saving single-page version...'); {$ENDIF}
+                     if (Variant = vReview) then
+                     begin
+                        continue;
+                     end;
+                     // Create this directory early as ProcessDocument relies on it to store
+                     // /multipage-dev/search-index.json
+                     if (Variant <> vSnap) then
+                     begin
+                        MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
+                     end;
+                     Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
                      {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                     Save(Documents[Variant], OutputDirectory + '/index-' + kSuffixes[Variant]);
+                     ProcessDocument(Documents[Variant], Variant, BigTOC, SourceGitSHA); // $R-
                      {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                     // output...
+                     if (Variant <> vDEV) then
+                     begin
+                        {$IFDEF TIMINGS} Writeln('Saving single-page version...'); {$ENDIF}
+                        {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                        Save(Documents[Variant], OutputDirectory + '/index-' + kSuffixes[Variant]);
+                        {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                     end;
+                     // multipage...
+                     if (Variant <> vSnap) then
+                     begin
+                        {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
+                        {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                        if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
+                           raise EAbort.Create('Could not split specification');
+                        {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                     end;
                   end;
-                  // multipage...
-                  {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
-                  {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                  if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
-                     raise EAbort.Create('Could not split specification');
-                  {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+               end
+               else
+               begin
+                  Assert(BuildType = 'review');
+                  // Skip timing information here as it should be roughly equivalent
+                  Inform('Generating ' + Uppercase(kSuffixes[vReview]) + ' exclusively...');
+                  ProcessDocument(Documents[Low(TVariants)], vReview, BigTOC, SourceGitSHA);
+                  Save(Documents[Low(TVariants)], OutputDirectory + '/index-' + kSuffixes[vReview]);
                end;
                Result := True;
             except
@@ -2633,8 +2687,15 @@ begin
             end;
          finally
             try
-               for Variant in TVariants do
-                  Documents[Variant].Free();
+               if (BuildType = 'default') then
+               begin
+                  for Variant in TVariants do
+                     Documents[Variant].Free();
+               end
+               else
+               begin
+                  Documents[Low(TVariants)].Free();
+               end;
             except
                ReportCurrentException();
             end;
