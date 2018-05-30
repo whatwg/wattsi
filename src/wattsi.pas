@@ -853,6 +853,11 @@ var
             end;
          end
          else
+         if (Element.IsIdentity(nsHTML, eBody)) and (Variant = vSnap) then
+         begin
+            Element.SetAttribute('class', 'status-LS-COMMIT');
+         end
+         else
          if (Element.IsIdentity(nsHTML, eSpan)) then
          begin
             ClassName := Element.GetAttribute('class').AsString;
