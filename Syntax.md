@@ -42,7 +42,7 @@ Wattsi does not perform any automatic pluralization or stemming. Thus, if you wa
 definitions</span> to be...</p>
 ```
 
-However, Wattsi is case-insensitive, so at least you don't have to worry about initial capitalization:
+However, canonical definition strings are case-insensitive, so at least you don't have to worry about initial capitalization:
 
 ```html
 <p><span>Custom element definitions</span> are awesome.</p>
@@ -127,7 +127,7 @@ you can use the `<ref>` void element:
 these selectors match HTML elements. <ref spec=SELECTORS> <ref spec=CSSUI></p>
 ```
 
-These match against a bibliography, which is a manually-maintained and sorted `<dl>` at the end of the source file. Its entries look like the following:
+These match against a bibliography, which is a manually-maintained and sorted `<dl>` at the end of the source file, identified by having the ID "`ref-list`". Its entries look like the following:
 
 ```html
 <dt id="refsSELECTORS">[SELECTORS]</dt>
@@ -146,19 +146,39 @@ There are currently up to five variants of the specification produced on each bu
 
 To selectively include or omit content from these variants, you can use the following attributes on any element:
 
-|Edition            |Include |Omit      |
-|-------------------|--------|----------|
-|Singlepage         |w-html  |w-nohtml  |
-|Multipage          |w-split |w-nosplit |
-|Developer's edition|w-dev   |w-nodev   |
-|Commit snapshots   |w-snap  |w-nosnap  |
-|Review drafts      |w-review|w-noreview|
+<dl>
+  <dt>w-nohtml
+  <dd>Omitted from singlepage and multipage
 
-The most important of these for day-to-day work is **w-nodev**, which excludes content (such as details only interesting to web browser implementers) from the developer's edition.
+  <dt>w-nosplit
+  <dd>Omitted from multipage
+
+  <dt>w-nodev
+  <dd>Ommitted from the developer's edition
+
+  <dt>w-nosnap
+  <dd>Omitted from commit snapshots
+
+  <dt>w-noreview
+  <dd>Omitted from review drafts
+
+  <dt>w-dev
+  <dd>Included only in the developer's edition; a shorthand for <code>w-nohtml w-nosplit w-nosnap w-noreview</code>
+</dl>
+
+The most important of these for day-to-day work is **w-nodev**, which is used to exclude content (such as details only interesting to web browser implementers) from the developer's edition.
 
 ## Macros
 
-Wattsi has a couple of macros used to insert common text fragments:
+Wattsi has several of macros used to insert common text fragments. They will act on exact, case-sensitive matches for the following HTML comment strings:
 
 * `<!-- NON-NORMATIVE SECTION -->` inserts a "This section is non-normative." notice. ([Example](https://html.spec.whatwg.org/multipage/introduction.html#suggested-reading))
 * `<!--INSERT FINGERPRINT-->` inserts a fingerprint image to indicate a feature that may cause fingerprinting. (See the "[Privacy concerns](https://html.spec.whatwg.org/multipage/introduction.html#fingerprint)" section)
+* `<!--smalltoc-->` inserts a table of contents limited to top-level headings
+* `<!--toc-->` inserts a complete table of contents
+
+Of these, only the first two will be useful for most spec editing.
+
+## Other processing
+
+Comments, apart from the above macros, will be stripped from the output. As such you can use them as notes to yourself or to future editors of the spec.
