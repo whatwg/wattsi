@@ -13,6 +13,10 @@ Currently:
  * Strip out unused references
  * Spec splitting
 
+## Wattsi Syntax
+
+For documentation on the "Wattsi language", e.g. things like `data-x` or `w-nodev`, see [Syntax.md](./Syntax.md).
+
 ## Building
 
 Wattsi is written in [Free Pascal](https://www.freepascal.org/). You'll need to install the [3.0.0 FreePascal compiler](https://www.freepascal.org/download.var) or newer to build it. With that installed, you should be able to run `./build.sh` to create the `wattsi` executable and supporting shared libraries.
