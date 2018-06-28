@@ -33,7 +33,7 @@ data-x="concept-custom-element-definition-name">name</dfn>.</p>
 data-x="concept-custom-element-definition-name">name</span>, ...</p>
 ```
 
-Note that the choice of `"concept-custom-element-definition-name"` was arbitrary; any unique string would suffice. However, since the ID for a `<dfn>` (and thus the URL fragment for any links to it) is derived from its canonical definition string, we try to choose ones that look nice.
+Note that the choice of `"concept-custom-element-definition-name"` was arbitrary; any unique string would suffice. However, since the ID for a `<dfn>` (and thus the URL fragment for any links to it) is derived from its canonical definition string, we try to choose ones that look nice and are meaningful.
 
 Wattsi does not perform any automatic pluralization or stemming. Thus, if you want to refer to a concept by some variant of its canonical definition string, you'll need to use `data-x=""` on the `<span>` or `<code>`:
 
@@ -51,8 +51,8 @@ However, canonical definition strings are case-insensitive, so at least you don'
 If you need to use a `<span>` or `<code>` element without it being a cross-reference, then you can use an empty `data-x=""` attribute:
 
 ```html
-<p>In the following document, the element definition for <code
-data-x="">img-viewer</code> is loaded asynchronously:</p>
+<p>In the following document, the element definition for <code data-x="">img-viewer</code> is loaded
+asynchronously:</p>
 ```
 
 ### Cross-specification cross references
@@ -100,8 +100,7 @@ We can then use these "proxy definitions" as normal:
 Definitions that are meant to be used by other specifications need to be exported using the [Bikeshed definition data model](https://tabatkins.github.io/bikeshed/#dfn-contract). In practice, this means adding `data-export=""` to the `<dfn>`, and if appropriate, `data-dfn-type=""`, `data-lt=""`, or `data-dfn-for=""` attributes. Some examples:
 
 ```html
-<p>The <code>Document</code> has an <dfn data-x="concept-document-https-state" data-export=""
-data-dfn-for="Document">HTTPS state</dfn>...</p>
+<p>To run steps <dfn data-export="">in parallel</dfn> means...</p>
 ```
 
 ```html
@@ -110,9 +109,22 @@ external resources</dfn></dt>
 ```
 
 ```html
+<p>The <code>Document</code> has an <dfn data-x="concept-document-https-state" data-export=""
+data-dfn-for="Document">HTTPS state</dfn>...</p>
+```
+
+```html
 <dt><dfn data-export="" data-dfn-type="selector"><code
 data-x="selector-defined">:defined</code></dfn></dt>
 ```
+
+For more information on how these are used, see the corresponding sections of the Bikeshed docs:
+
+* [Definition Types](https://tabatkins.github.io/bikeshed/#dfn-types) (`data-dfn-type=""`)
+* [Changing the Linking Text](https://tabatkins.github.io/bikeshed/#dfn-types) (`data-lt=""`)
+* [Namespacing a Definition](https://tabatkins.github.io/bikeshed/#dfn-for) (`data-dfn-for=""`)
+
+Note that the syntax those sections describe is different than the `data-*` attributes used in [the general protocol](https://tabatkins.github.io/bikeshed/#dfn-contract), since those documentation sections are describing how to write Bikeshed source files. But the semantics and value spaces are the same.
 
 ## References to other specifications
 
@@ -163,7 +175,7 @@ To selectively include or omit content from these variants, you can use the foll
   <dd>Omitted from review drafts
 
   <dt>w-dev
-  <dd>Included only in the developer's edition; a shorthand for <code>w-nohtml w-nosplit w-nosnap w-noreview</code>
+  <dd>Included only in the developer's edition; a shorthand for <code>w-nohtml w-nosnap w-noreview</code>
 </dl>
 
 The most important of these for day-to-day work is **w-nodev**, which is used to exclude content (such as details only interesting to web browser implementers) from the developer's edition.
