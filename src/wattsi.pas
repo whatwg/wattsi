@@ -42,11 +42,12 @@ uses
    sysutils, {$IFOPT C+} rtlutils, {$ENDIF} fileutils, stringutils,
    dateutils, genericutils, hashfunctions, hashtable, hashset,
    plasticarrays, exceptions, unicode, ropes, wires, canonicalstrings,
-   dom, webdom, htmlparser, json;
+   dom, webdom, htmlparser, json, process, fphttpclient;
 
 var
    Quiet: Boolean = false;
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
+   HighlightServerURL: AnsiString = '';
    OutputDirectory: AnsiString;
    SearchIndexJsonFile: Text;
    IsFirstSearchIndexItem: Boolean = true;
@@ -54,6 +55,10 @@ var
 type
    TAllVariants = (vHTML, vDEV, vSnap, vReview, vSplit);
    TVariants = vHTML..vReview;
+   TStringMap = specialize THashTable <UTF8String, UTF8String, UTF8StringUtils>;
+
+var
+   HighlighterOutputByJSONContents: TStringMap;
 
 const
    kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap', 'review');
@@ -122,6 +127,26 @@ var
    Browsers: array[TBrowserIndex] of TBrowser;
    Features: TFeatureMap;
 
+procedure Inform(Message: UTF8String);
+begin
+   if (not Quiet) then
+      Writeln(Message);
+end;
+
+function IsHighlighterTarget(const Element: TElement; const ClassValue: String): Boolean;
+begin
+   Result := ((HighlightServerURL <> '')
+      and (Element.IsIdentity(nsHTML, ePre)
+         or (Element.IsIdentity(nsHTML, eCode)
+            and (Element.ParentNode is TElement)
+            and TElement(Element.ParentNode).IsIdentity(nsHTML, ePre)))
+      and Element.HasAttribute('class')
+      and (AnsiContainsStr(ClassValue, 'idl')
+         or AnsiContainsStr(ClassValue, 'css')
+         or AnsiContainsStr(ClassValue, 'js')
+         or AnsiContainsStr(ClassValue, 'html')));
+end;
+
 procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement; const SourceGitSHA: AnsiString);
 type
    PElementListNode = ^TElementListNode;
@@ -158,7 +183,6 @@ type
    // preserve order), we use TFPGMap & TStringList (which both preserve order).
    TXrefAnchorsBySectionName = specialize TFPGMap <UTF8String, TStringList>;
    TXrefsByDFNAnchor = specialize THashTable <UTF8String, TXrefAnchorsBySectionName, UTF8StringUtils>;
-   THeadingTextBySectionNumber = specialize THashTable <UTF8String, UTF8String, UTF8StringUtils>;
 
 var
    IDs: TElementMap; // The keys in these hashtables must outlive the DOM, since the DOM points to those strings
@@ -172,7 +196,7 @@ var
    StringStore: TStringStore;
    Errors: Cardinal;
    XrefsByDFNAnchor: TXrefsByDFNAnchor;
-   HeadingTextBySectionNumber: THeadingTextBySectionNumber;
+   HeadingTextBySectionNumber: TStringMap;
 
    function NewXrefsByDFNAnchor(SectionName: UTF8String; Anchor: UTF8String): TXrefAnchorsBySectionName;
    var
@@ -615,11 +639,14 @@ var
       ListNode: PElementListNode;
       DFNEntry: TDFNEntry;
       ID, HeadingText, ParentHeadingText, SectionNumber, ParentSectionNumber: UTF8String;
+      ClassValue: String = '';
    begin
       Result := True;
       if (Node is TElement) then
       begin
          Element := TElement(Node);
+         if (Element.HasAttribute('class')) then
+            ClassValue := Element.GetAttribute('class').AsString;
          if (Element.HasProperties(propHeading)) then
          begin
             ClassName := Element.GetAttribute('class').AsString;
@@ -947,7 +974,7 @@ var
             SaveCrossReference(Element);
          end
          else
-         if (Element.IsIdentity(nsHTML, ePre) and (Element.GetAttribute('class').AsString = 'idl') and (Variant = vDEV)) then
+         if (IsHighlighterTarget(Element, ClassValue) and AnsiContainsStr(ClassValue, 'idl') and (Variant = vDEV)) then
          begin
             Result := False;
          end
@@ -1320,8 +1347,9 @@ var
    ListNodeHead, ListNode, NextListNode: PElementListNode;
    Anchor, DFNAnchor, SectionName: UTF8String;
 begin
+   HighlighterOutputByJSONContents := TStringMap.Create(@UTF8StringHash32);
    XrefsByDFNAnchor := TXrefsByDFNAnchor.Create(@UTF8StringHash32);
-   HeadingTextBySectionNumber := THeadingTextBySectionNumber.Create(@UTF8StringHash32);
+   HeadingTextBySectionNumber := TStringMap.Create(@UTF8StringHash32);
    IDs := TElementMap.Create(@UTF8StringHash32);
    Document.TakeOwnership(IDs);
    StringStore := TStringStore.Create();
@@ -1731,9 +1759,9 @@ procedure Save(const Document: TDocument; const FileName: AnsiString; const InSp
 var
    F: Text;
    CurrentElement: TElement;
-   AsJSON, StartingNewJSONObject: Boolean;
-   JSONContents: UTF8String;
-   HTMLContents: UTF8String;
+   CurrentlyInHighlightedElement, StartingNewJSONObject: Boolean;
+   CurrentHighlightedElementJSON: UTF8String;
+   CurrentHighlightedElementFallbackHTML: UTF8String;
 
    function AutoclosedBy(const Before: TElement; const After: TNode): Boolean;
    begin
@@ -1832,16 +1860,16 @@ Result := False;
       end;
    end;
 
-   procedure WriteJSON(const JSONFragment: UTF8String);
+   procedure WriteJSONIfInHighlightedElement(const JSONFragment: UTF8String);
    begin
-      if (AsJSON) then
-         JSONContents := JSONContents + JSONFragment;
+      if (CurrentlyInHighlightedElement) then
+         CurrentHighlightedElementJSON := CurrentHighlightedElementJSON + JSONFragment;
    end;
 
    procedure WriteHTML(const HTMLFragment: UTF8String);
    begin
-      if (AsJSON) then
-         HTMLContents := HTMLContents + HTMLFragment
+      if (CurrentlyInHighlightedElement) then
+         CurrentHighlightedElementFallbackHTML := CurrentHighlightedElementFallbackHTML + HTMLFragment
       else
          Write(F, HTMLFragment);
    end;
@@ -1858,13 +1886,13 @@ Result := False;
       if ((not IsExcluder) and ((AttributeCount > 0) or (not (Element.HasProperties(propOptionalStartTag) or SkippableTBodyStartTag(Element))))) then
       begin
          if (not StartingNewJSONObject) then
-            WriteJSON(',');
-         WriteJSON('["' + Element.LocalName.AsString + '"');
+            WriteJSONIfInHighlightedElement(',');
+         WriteJSONIfInHighlightedElement('["' + Element.LocalName.AsString + '"');
          WriteHTML('<' + Element.LocalName.AsString);
          NotFirstAttribute := False;
          if (AttributeCount > 0) then
          begin
-            WriteJSON(',{');
+            WriteJSONIfInHighlightedElement(',{');
             for AttributeName in Element.Attributes do
             begin
                Skip := False;
@@ -1889,20 +1917,30 @@ Result := False;
                         EscapedAttributeName[Index] := ':';
                end;
                if (NotFirstAttribute) then
-                  WriteJSON(',')
+                  WriteJSONIfInHighlightedElement(',')
                else
                   NotFirstAttribute := True;
-               WriteJSON('"' + EscapedAttributeName + '": "' + EscapedAttributeValue + '"');
+               if (Element.LocalName.AsString = 'pre') and (AttributeName = 'class') then
+                  WriteJSONIfInHighlightedElement('"class": "' + EscapedAttributeValue + ' highlight"')
+               else
+                  WriteJSONIfInHighlightedElement('"' + EscapedAttributeName + '": "' + EscapedAttributeValue + '"');
                case (Quotes) of
                   qtSingle: WriteHTML(' ' + EscapedAttributeName + '=''' + EscapedAttributeValue + '''');
                   qtDouble: WriteHTML(' ' + EscapedAttributeName + '="' + EscapedAttributeValue + '"');
                else WriteHTML(' ' + EscapedAttributeName + '=' + EscapedAttributeValue);
                end;
             end;
-            WriteJSON('}');
-         end;
+            if (Element.LocalName.AsString = 'pre') and (not (Element.HasAttribute('class'))) then
+               WriteJSONIfInHighlightedElement(',"class":"highlight"');
+            WriteJSONIfInHighlightedElement('}')
+         end
+         else
+            if (Element.LocalName.AsString = 'pre') then
+               WriteJSONIfInHighlightedElement(',{"class":"highlight"}')
+            else
+               WriteJSONIfInHighlightedElement(',{}');
          if (Element.HasProperties(propVoidElement)) then
-            WriteJSON(']');
+            WriteJSONIfInHighlightedElement(']');
          WriteHTML('>');
       end;
       CurrentElement := Element;
@@ -1912,6 +1950,9 @@ Result := False;
    var
       IsExcluder: Boolean;
       AttributeCount: Cardinal;
+      URLEncodedJSONContents: String;
+      HighlighterOutput: String;
+      ClassValue: String = '';
    begin
       if (InSplit and Element.HasAttribute(kExcludingAttribute[vSplit])) then
          exit;
@@ -1919,8 +1960,40 @@ Result := False;
       if (not (IsExcluder or Element.HasProperties(propVoidElement) or
                (Element.HasProperties(propOptionalEndTag) and ((not Assigned(Element.NextSibling)) or (AutoclosedBy(Element, Element.NextSibling)))))) then
       begin
-         WriteJSON(']');
+         WriteJSONIfInHighlightedElement(']');
          WriteHTML('</' + Element.LocalName.AsString + '>');
+         if (Element.HasAttribute('class')) then
+            ClassValue := Element.GetAttribute('class').AsString;
+         if (IsHighlighterTarget(Element, ClassValue)) then
+         begin
+            URLEncodedJSONContents := EncodeURLElement(CurrentHighlightedElementJSON);
+            try
+               if (HighlighterOutputByJSONContents.Has(CurrentHighlightedElementJSON)) then
+                  Write(F, HighlighterOutputByJSONContents[CurrentHighlightedElementJSON])
+               else
+               begin
+                  if (AnsiContainsStr(ClassValue, 'idl')) then
+                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/webidl?' + URLEncodedJSONContents)
+                  else
+                  if (AnsiContainsStr(ClassValue, 'css')) then
+                    HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/css?' + URLEncodedJSONContents)
+                  else
+                  if (AnsiContainsStr(ClassValue, 'js')) then
+                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/js?' + URLEncodedJSONContents)
+                  else
+                  if (AnsiContainsStr(ClassValue, 'html')) then
+                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/html?' + URLEncodedJSONContents);
+                  HighlighterOutputByJSONContents[CurrentHighlightedElementJSON] := HighlighterOutput;
+                  Write(F, Trim(HighlighterOutput));
+               end;
+            except
+              on E: EHTTPClient do
+                  Write(F, CurrentHighlightedElementFallbackHTML);
+            end;
+            CurrentHighlightedElementJSON := '';
+            CurrentHighlightedElementFallbackHTML := '';
+            CurrentlyInHighlightedElement := False;
+         end;
       end;
       if (Element.ParentNode is TElement) then
          CurrentElement := TElement(Element.ParentNode)
@@ -1930,20 +2003,36 @@ Result := False;
 
 var
    Current: TNode;
+   ClassValue: String = '';
+   Element: TElement;
 begin
    Assign(F, FileName);
    Rewrite(F);
    WriteHTML('<!DOCTYPE html>');
    Current := Document.DocumentElement;
    CurrentElement := nil;
-   AsJSON := False;
-   JSONContents := '';
-   HTMLContents := '';
+   CurrentlyInHighlightedElement := False;
+   CurrentHighlightedElementJSON := '';
+   CurrentHighlightedElementFallbackHTML := '';
+
+   if (HighlightServerURL <> '') then
+      Inform('Highlighting and saving ' + ExtractFileName(FileName))
+   else
+      Inform('Saving ' + ExtractFileName(FileName));
+
    repeat
       Assert(Assigned(Current));
       StartingNewJSONObject := False;
       if (Current is TElement) then
       begin
+         Element := TElement(Current);
+         if (Element.HasAttribute('class')) then
+            ClassValue := Element.GetAttribute('class').AsString;
+         if (IsHighlighterTarget(Element, ClassValue)) then
+         begin
+            CurrentlyInHighlightedElement := True;
+            StartingNewJSONObject := True;
+         end;
          if (InSplit and TElement(Current).HasAttribute(kExcludingAttribute[vSplit])) then
          begin
             WalkToNextSkippingChildren(Current, Document, @WalkOut);
@@ -1956,18 +2045,18 @@ begin
       if (Current is TText) then
       begin
          Assert(Assigned(CurrentElement));
-         WriteJSON(',"');
+         WriteJSONIfInHighlightedElement(',"');
          if (CurrentElement.HasProperties(propRawTextElement)) then
          begin
-            WriteJSON(EscapeForJSON(TText(Current).Data).AsString);
+            WriteJSONIfInHighlightedElement(EscapeForJSON(TText(Current).Data).AsString);
             WriteHTML(TText(Current).Data.AsString);
          end
          else
          begin
-            WriteJSON(EscapeForJSON(TText(Current).Data).AsString);
+            WriteJSONIfInHighlightedElement(EscapeForJSON(TText(Current).Data).AsString);
             WriteHTML(EscapeText(TText(Current).Data).AsString);
          end;
-         WriteJSON('"');
+         WriteJSONIfInHighlightedElement('"');
       end;
       if (not WalkToNext(Current, Document, @WalkOut)) then
          break;
@@ -2058,6 +2147,7 @@ begin
    Document.DocumentElement.InsertBefore(Link, FirstChild);
    // find body
    Current := Document;
+   Inform('Splitting...');
    repeat
       WalkToNext(Current, Document, nil)
    until (Current is TElement) and TElement(Current).IsIdentity(nsHTML, eBody);
@@ -2385,12 +2475,6 @@ begin
    {$ENDIF}
 end;
 
-procedure Inform(Message: UTF8String);
-begin
-   if (not Quiet) then
-      Writeln(Message);
-end;
-
 // http://wiki.freepascal.org/UTF8_strings_and_characters#Search_and_copy
 // TODO: SplitInHalf is expensive, should use ropes. https://github.com/whatwg/wattsi/issues/40
 function SplitInHalf(Txt, Separator: UTF8String; out Half1, Half2: UTF8String): Boolean;
@@ -2654,11 +2738,23 @@ var
    Variant: TAllVariants;
 begin
    Result := False;
+   if (ParamStr(1) = '--quiet') then
+   begin
+      Quiet := true;
+      ParamOffset := 1;
+   end;
    if (ParamCount() <> 6) then
-      if ((ParamCount() = 7) and (ParamStr(1) = '--quiet')) then
+      if (ParamCount() = 7) then
       begin
-         Quiet := true;
-         ParamOffset := 1;
+         if (not Quiet) then
+         begin
+            HighlightServerURL := ParamStr(7);
+         end
+      end
+      else
+      if ((ParamCount() = 8) and Quiet) then
+      begin
+         HighlightServerURL := ParamStr(8);
       end
       else
       if ((ParamCount() = 1) and (ParamStr(1) = '--version')) then
@@ -2670,7 +2766,7 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <bugs.csv>');
+         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <bugs.csv> [<highlight-server-url>]');
          Writeln('  wattsi --version');
          exit;
       end;
