@@ -2008,7 +2008,7 @@ var
 begin
    Assign(F, FileName);
    Rewrite(F);
-   WriteHTML('<!DOCTYPE html>');
+   Write(F, '<!DOCTYPE html>');
    Current := Document.DocumentElement;
    CurrentElement := nil;
    CurrentlyInHighlightedElement := False;
