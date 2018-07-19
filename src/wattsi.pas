@@ -1976,7 +1976,7 @@ Result := False;
                      HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/webidl?' + URLEncodedJSONContents)
                   else
                   if (AnsiContainsStr(ClassValue, 'css')) then
-                    HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/css?' + URLEncodedJSONContents)
+                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/css?' + URLEncodedJSONContents)
                   else
                   if (AnsiContainsStr(ClassValue, 'js')) then
                      HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/js?' + URLEncodedJSONContents)
