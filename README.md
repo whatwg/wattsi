@@ -12,6 +12,7 @@ Currently:
  * Cross-reference back (`<dfn>` menu)
  * Strip out unused references
  * Spec splitting
+ * Add syntax-highlighting markup to `<pre>` contents
 
 ## Wattsi Syntax
 
