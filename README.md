@@ -11,6 +11,7 @@ Currently:
  * Create small TOC
  * Cross-reference back (`<dfn>` menu)
  * Strip out unused references
+ * Check for missing references
  * Spec splitting
  * Add syntax-highlighting markup to `<pre>` contents
 

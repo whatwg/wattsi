@@ -188,6 +188,7 @@ var
    IDs: TElementMap; // The keys in these hashtables must outlive the DOM, since the DOM points to those strings
    CrossReferences: TCrossReferences;
    References: TReferences;
+   MissingReferences: TReferences;
    SmallTOC: TElement;
    SmallTOCBookmark, BigTOCBookmark: TNode;
    LastHeadingRank: THeadingRank;
@@ -1016,6 +1017,7 @@ var
             ListNode^.Value := Element;
             ListNode^.Next := References[ReferenceName];
             References[ReferenceName] := ListNode;
+            MissingReferences[ReferenceName] := ListNode;
             NewLink := ConstructHTMLElement(eA);
             Scratch := Default(Rope);
             Scratch.Append('#refs');
@@ -1050,6 +1052,8 @@ var
                      Fail('Unused reference: [' + LastSeenReferenceName + ']');
                   Result := False;
                end
+               else
+                  MissingReferences.Remove(LastSeenReferenceName);
             end
             else
                LastSeenReferenceName := '';
@@ -1345,7 +1349,7 @@ var
    NewLink, DFN: TElement;
    DFNEntry: TDFNEntry;
    ListNodeHead, ListNode, NextListNode: PElementListNode;
-   Anchor, DFNAnchor, SectionName: UTF8String;
+   Anchor, DFNAnchor, SectionName, MissingReferenceName: UTF8String;
 begin
    HighlighterOutputByJSONContents := TStringMap.Create(@UTF8StringHash32);
    XrefsByDFNAnchor := TXrefsByDFNAnchor.Create(@UTF8StringHash32);
@@ -1355,6 +1359,7 @@ begin
    StringStore := TStringStore.Create();
    Document.TakeOwnership(StringStore);
    References := TReferences.Create(@UTF8StringHash32, 12);
+   MissingReferences := TReferences.Create(@UTF8StringHash32, 12);
    CrossReferences.DFNs := TDFNTable.Create(@UTF8StringHash32);
    CrossReferences.First := nil;
    CrossReferences.Last := nil;
@@ -1524,7 +1529,16 @@ begin
             ListNode := NextListNode;
          end;
       end;
+      if (Variant <> vDEV) then
+      begin
+         for MissingReferenceName in MissingReferences.GetEnumerator do
+         begin
+            MissingReferences.Remove(MissingReferenceName);
+            Fail('Missing reference: [' + MissingReferenceName + ']');
+         end;
+      end;
       References.Free();
+      MissingReferences.Free();
    end;
    if (Errors > 0) then
    begin
