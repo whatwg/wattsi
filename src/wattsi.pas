@@ -87,9 +87,6 @@ type
       Versions: array of UTF8String;
    end;
    TBrowserIndex = 1..InterestingBrowserCount;
-   TBug = record
-      ID, URL, Summary: UTF8String;
-   end;
    TImplState = (sYes, sAlmost, sNo, sRemoved, sPolyfill, sUnknown, sPrefix, sDisabled, sNotes);
    TImplGoodState = sYes..sRemoved;
    TVersionedState = record
@@ -100,7 +97,6 @@ type
    TFeature = record
       CanIUseCode: UTF8String;
       FirstGoodVersion: array[TBrowserIndex] of TVersionedState;
-      Bugs: array of TBug;
       procedure Reset();
    end;
 
@@ -118,7 +114,6 @@ begin
       FirstGoodVersion[BrowserIndex].State := sNo;
       FirstGoodVersion[BrowserIndex].Version := '';
    end;
-   SetLength(Bugs, 0);
 end;
 
 var
@@ -1175,7 +1170,6 @@ var
    var
       ID: UTF8String;
       Feature: TFeature;
-      Bug: TBug;
       Container: TElement;
       Context, Ancestor: TNode;
       Status, P: TElement;
@@ -1220,8 +1214,6 @@ var
                if ((Ancestor = BigTOC) or (Ancestor = SmallTOC)) then
                begin
                   Warn('Found ID ' + ID + ' in a table of contents for annotation that uses URLs:');
-                  for Bug in Feature.Bugs do
-                     Writeln('   ', Bug.URL);
                   if (Feature.CanIUseCode <> '') then
                      Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
                   Found := True;
@@ -1245,19 +1237,6 @@ var
                Container.InsertBefore(Status, Context);
             end;
 
-            if ((Length(Feature.Bugs) > 0) and (Variant <> vDEV)) then
-            begin
-               P := E(eP, ['class', 'bugs'], [E(eStrong, [T('Spec bugs:')]), T(' ')]);
-               First := True;
-               for Bug in Feature.Bugs do
-               begin
-                  if (not First) then
-                     P.AppendChild(T(', '));
-                  P.AppendChild(E(eA, ['href', Bug.URL, 'title', Bug.Summary], Document, [T(Bug.ID, Document)]));
-                  First := False;
-               end;
-               Status.AppendChild(P);
-            end;
 {$IFDEF VERBOSE_ANNOTATIONS} Writeln('    built'); {$ENDIF}
             Found := False;
             for BrowserIndex in TBrowserIndex do
@@ -1319,15 +1298,6 @@ var
          end
          else
          begin
-            if (Variant <> vDEV) then
-            begin
-               Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
-               for Bug in Feature.Bugs do
-                  Writeln('   ', Bug.URL);
-               if (Feature.CanIUseCode <> '') then
-                  Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
-            end
-            else
             if (Feature.CanIUseCode <> '') then
             begin
                Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
@@ -2405,76 +2375,6 @@ begin
    {$ENDIF}
 end;
 
-function BugzillaURLToID(const SpecURL: UTF8String; out ID: UTF8String): Boolean;
-var
-   HashIndex: Cardinal;
-begin
-   ID := '';
-   Result := True;
-   if ((Pos('http://www.w3.org/TR/html51/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/TR/html5/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/TR/html/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/html/wg/drafts/html/master/', SpecURL) = 1) or
-       (Pos('http://dev.w3.org/html5/spec/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/TR/2011/WD-html5-20110525/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/TR/2014/PR-html5-20140916/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/TR/workers/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/TR/webstorage/', SpecURL) = 1) or
-       (Pos('http://www.w3.org/TR/webmessaging/', SpecURL) = 1) or
-       (Pos('https://html.spec.whatwg.org/', SpecURL) = 1) or
-       (Pos('https://www.whatwg.org/specs/web-apps/current-work/', SpecURL) = 1) or
-       (Pos('http://www.whatwg.org/specs/web-apps/current-work/', SpecURL) = 1) or
-       (Pos('https://whatwg.org/specs/web-apps/current-work/', SpecURL) = 1) or
-       (Pos('http://whatwg.org/specs/web-apps/current-work/', SpecURL) = 1)) then
-   begin
-      HashIndex := Pos('#', SpecURL); // $R-
-      if (HashIndex > 0) then
-      begin
-         ID := Copy(SpecURL, HashIndex+1, Length(SpecURL)-HashIndex);
-      end
-      else
-      if (SpecURL = 'http://www.w3.org/TR/workers/') then
-      begin
-         ID := 'workers';
-      end
-      else
-         Result := False;
-   end
-   else
-   if ((SpecURL = 'http://www.w3.org/TR/eventsource/') or
-       (SpecURL = 'http://dev.w3.org/html5/eventsource/')) then
-   begin
-      ID := 'server-sent-events';
-   end
-   else
-   if (SpecURL = 'http://www.w3.org/TR/xhtml1/') then
-   begin
-      ID := 'parsing-xhtml-documents';
-   end
-   else
-   if ((SpecURL = 'http://www.w3.org/TR/websockets/') or
-       (SpecURL = 'http://dev.w3.org/html5/websockets/')) then
-   begin
-      ID := 'network';
-   end
-   else
-   if (SpecURL = 'http://www.w3.org/TR/html-markup/ruby.html') then
-   begin
-      ID := 'the-ruby-element';
-   end
-   else
-      Result := False;
-   if (Result) then
-   begin
-      if (ID = 'top') then
-         Result := False;
-   end;
-   {$IFDEF VERBOSE_ID_FINDER}
-      if (not Result) then
-         Writeln('Could not find ID in: ', SpecURL);
-   {$ENDIF}
-end;
-
 // http://wiki.freepascal.org/UTF8_strings_and_characters#Search_and_copy
 // TODO: SplitInHalf is expensive, should use ropes. https://github.com/whatwg/wattsi/issues/40
 function SplitInHalf(Txt, Separator: UTF8String; out Half1, Half2: UTF8String): Boolean;
@@ -2633,95 +2533,6 @@ begin
    end;
 end;
 
-procedure PreProcessBugsData(const BugsFilename: AnsiString);
-type
-   TCSVParseMode = (pmRaw, pmQuoted, pmEscaped);
-var
-   BugsFile: Text;
-   S, ID: UTF8String;
-   Fields: array[0..2] of UTF8String;
-   StringIndex, Field: Cardinal;
-   Mode: TCSVParseMode;
-   Bug: TBug;
-   Feature: TFeature;
-begin
-   Inform('Parsing bugs data...');
-   Assign(BugsFile, BugsFilename);
-   Reset(BugsFile);
-   Readln(BugsFile); // skip header
-   while not eof(BugsFile) do
-   begin
-      Readln(BugsFile, S);
-      StringIndex := 1;
-      Mode := pmRaw;
-      Field := 0;
-      Fields[0] := '';
-      Fields[1] := '';
-      Fields[2] := '';
-      while ((StringIndex < Length(S)) and (Field <= High(Fields))) do
-      begin
-         case (S[StringIndex]) of
-            '"':
-               begin
-                  case (Mode) of
-                     pmQuoted:
-                        begin
-                           Mode := pmEscaped;
-                        end;
-                     pmEscaped:
-                        begin
-                           Mode := pmQuoted;
-                           Fields[Field] := Fields[Field] + '"';
-                        end;
-                     else
-                        begin
-                           Mode := pmQuoted;
-                           // fail if field is not ''
-                        end;
-                  end;
-               end;
-            ',':
-               begin
-                  case (Mode) of
-                     pmQuoted:
-                        begin
-                           Fields[Field] := Fields[Field] + ',';
-                        end;
-                     pmEscaped:
-                        begin
-                           Mode := pmRaw;
-                           Inc(Field);
-                        end;
-                     else
-                        begin
-                           Inc(Field);
-                        end;
-                  end;
-               end;
-            else
-               begin
-                  Fields[Field] := Fields[Field] + S[StringIndex];
-                  // fail if Mode is pmEscaped
-               end;
-         end;
-         Inc(StringIndex);
-      end;
-      if (not BugzillaURLToID(Fields[1], ID)) then
-         continue;
-      if (Features.Has(ID)) then
-         Feature := Features[ID]
-      else
-         Feature.Reset();
-      Bug.ID := Fields[0];
-      Bug.URL := 'https://www.w3.org/Bugs/Public/show_bug.cgi?id=' + Fields[0];
-      Bug.Summary := Fields[2];
-      SetLength(Feature.Bugs, Length(Feature.Bugs)+1);
-      Feature.Bugs[High(Feature.Bugs)] := Bug;
-      Features[ID] := Feature;
-   end;
-   Close(BugsFile);
-end;
-
 function Main(): Boolean;
 const
    OtherVariants = [Low(TVariants)..High(TVariants)] - [Low(TVariants)];
@@ -2743,18 +2554,18 @@ begin
       Quiet := true;
       ParamOffset := 1;
    end;
-   if (ParamCount() <> 6) then
-      if (ParamCount() = 7) then
+   if (ParamCount() <> 5) then
+      if (ParamCount() = 6) then
       begin
          if (not Quiet) then
          begin
-            HighlightServerURL := ParamStr(7);
+            HighlightServerURL := ParamStr(6);
          end
       end
       else
-      if ((ParamCount() = 8) and Quiet) then
+      if ((ParamCount() = 7) and Quiet) then
       begin
-         HighlightServerURL := ParamStr(8);
+         HighlightServerURL := ParamStr(7);
       end
       else
       if ((ParamCount() = 1) and (ParamStr(1) = '--version')) then
@@ -2766,7 +2577,7 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <bugs.csv> [<highlight-server-url>]');
+         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> [<highlight-server-url>]');
          Writeln('  wattsi --version');
          exit;
       end;
@@ -2784,7 +2595,6 @@ begin
    Features := TFeatureMap.Create(@UTF8StringHash32);
    try
       PreProcessCanIUseData(ParamStr(5 + ParamOffset));
-      PreProcessBugsData(ParamStr(6 + ParamOffset));
       {$IFDEF VERBOSE_PREPROCESSORS}
          if (Assigned(Features)) then
             for ID in Features do
@@ -2794,9 +2604,6 @@ begin
                   if (Features[ID].FirstGoodVersion[BrowserIndex] <> '') then
                      Write(' ', Browsers[BrowserIndex].Name, ' ', Features[ID].FirstGoodVersion[BrowserIndex], '+ ');
                Writeln();
-               if (Length(Features[ID].Bugs) > 0) then
-                  for BugIndex := Low(Features[ID].Bugs) to High(Features[ID].Bugs) do // $R-
-                     Writeln(' ', Features[ID].Bugs[BugIndex].ID, ' ', Features[ID].Bugs[BugIndex].Summary);
             end;
       {$ENDIF}
       nsNone := Intern('');
