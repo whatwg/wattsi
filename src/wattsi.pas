@@ -139,7 +139,8 @@ begin
       and (AnsiContainsStr(ClassValue, 'idl')
          or AnsiContainsStr(ClassValue, 'css')
          or AnsiContainsStr(ClassValue, 'js')
-         or AnsiContainsStr(ClassValue, 'html')));
+         or AnsiContainsStr(ClassValue, 'html')
+         or AnsiContainsStr(ClassValue, 'abnf')));
 end;
 
 procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement; const SourceGitSHA: AnsiString);
