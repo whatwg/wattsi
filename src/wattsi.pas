@@ -643,6 +643,11 @@ var
          Element := TElement(Node);
          if (Element.HasAttribute('class')) then
             ClassValue := Element.GetAttribute('class').AsString;
+         if (IsHighlighterTarget(Element, ClassValue) and AnsiContainsStr(ClassValue, 'idl') and (Variant = vDEV)) then
+         begin
+            Result := False;
+         end
+         else
          if (Element.HasProperties(propHeading)) then
          begin
             ClassName := Element.GetAttribute('class').AsString;
@@ -968,11 +973,6 @@ var
             if (Element.HasAttribute(kLTAttribute)) then
                Fail('<code> with lt="" found, use data-x="" instead; code is ' + Describe(Element));
             SaveCrossReference(Element);
-         end
-         else
-         if (IsHighlighterTarget(Element, ClassValue) and AnsiContainsStr(ClassValue, 'idl') and (Variant = vDEV)) then
-         begin
-            Result := False;
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('class').AsString = 'sha-link') and (Variant = vSnap)) then
@@ -1856,6 +1856,12 @@ Result := False;
       Quotes: TQuoteType;
       Variant: TAllVariants;
    begin
+      // The following causes the <pre> start tag for any empty pre elements to
+      // be dropped. We can end up with empty pre elements because the first
+      // pass may drop <code class="idl"> elements from the dev edition, leaving
+      // behind the (now-empty) pre parents of the <code class="idl"> elements.
+      if Element.IsIdentity(nsHTML, ePre) and (Element.TextContent.AsString = '') then
+         exit;
       IsExcluder := DetermineIsExcluder(Element, AttributeCount);
       if ((not IsExcluder) and ((AttributeCount > 0) or (not (Element.HasProperties(propOptionalStartTag) or SkippableTBodyStartTag(Element))))) then
       begin
@@ -1928,6 +1934,12 @@ Result := False;
       HighlighterOutput: String;
       ClassValue: String = '';
    begin
+      // The following causes the </pre> end tag for any empty pre elements to
+      // be dropped. We can end up with empty pre elements because the first
+      // pass may drop <code class="idl"> elements from the dev edition, leaving
+      // behind the (now-empty) pre parents of the <code class="idl"> elements.
+      if Element.IsIdentity(nsHTML, ePre) and (Element.TextContent.AsString = '') then
+         exit;
       if (InSplit and Element.HasAttribute(kExcludingAttribute[vSplit])) then
          exit;
       IsExcluder := DetermineIsExcluder(Element, AttributeCount);
