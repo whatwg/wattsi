@@ -647,6 +647,11 @@ var
          Element := TElement(Node);
          if (Element.HasAttribute('class')) then
             ClassValue := Element.GetAttribute('class').AsString;
+         if (IsHighlighterTarget(Element, ClassValue) and AnsiContainsStr(ClassValue, 'idl') and (Variant = vDEV)) then
+         begin
+            Result := False;
+         end
+         else
          if (Element.HasProperties(propHeading)) then
          begin
             ClassName := Element.GetAttribute('class').AsString;
@@ -972,11 +977,6 @@ var
             if (Element.HasAttribute(kLTAttribute)) then
                Fail('<code> with lt="" found, use data-x="" instead; code is ' + Describe(Element));
             SaveCrossReference(Element);
-         end
-         else
-         if (IsHighlighterTarget(Element, ClassValue) and AnsiContainsStr(ClassValue, 'idl') and (Variant = vDEV)) then
-         begin
-            Result := False;
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('class').AsString = 'sha-link') and (Variant = vSnap)) then
@@ -2031,6 +2031,13 @@ begin
          Element := TElement(Current);
          if (Element.HasAttribute('class')) then
             ClassValue := Element.GetAttribute('class').AsString;
+         if Element.IsIdentity(nsHTML, ePre) and (Element.TextContent.AsString = '') then
+         begin
+            // This occurs because the first pass may drop <code class="idl"> elements in the dev
+            // edition, leaving empty <pre>s.
+            WalkToNextSkippingChildren(Current, Document, @WalkOut);
+            continue;
+         end;
          if (IsHighlighterTarget(Element, ClassValue)) then
          begin
             CurrentlyInHighlightedElement := True;
