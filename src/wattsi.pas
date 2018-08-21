@@ -1457,7 +1457,10 @@ begin
                   end;
                end
                else
-               if (Variant <> vDEV) then
+               if (Variant <> vDEV) and
+                  not(CrossRefNode^.Element.IsIdentity(nsHTML, eCode)
+                     and (CrossRefNode^.Element.ParentNode is TElement)
+                     and (CrossRefNode^.Element.ParentNode as TElement).IsIdentity(nsHTML, ePre)) then
                begin
                   if (CrossRefNode^.Kind = crExplicit) then
                   begin
