@@ -2030,6 +2030,8 @@ begin
             ClassValue := Element.GetAttribute('class').AsString;
          if Element.IsIdentity(nsHTML, ePre) and (Element.TextContent.AsString = '') then
          begin
+            // This occurs because the first pass may drop <code class="idl"> elements in the dev
+            // edition, leaving empty <pre>s.
             WalkToNextSkippingChildren(Current, Document, @WalkOut);
             continue;
          end;
