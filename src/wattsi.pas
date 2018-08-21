@@ -1985,6 +1985,9 @@ Result := False;
                   if (AnsiContainsStr(ClassValue, 'js')) then
                      HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/js?' + URLEncodedJSONContents)
                   else
+                  if (AnsiContainsStr(ClassValue, 'abnf')) then
+                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/abnf?' + URLEncodedJSONContents)
+                  else
                   if (AnsiContainsStr(ClassValue, 'html')) then
                      HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/html?' + URLEncodedJSONContents);
                   HighlighterOutputByJSONContents[CurrentHighlightedElementJSON] := HighlighterOutput;
