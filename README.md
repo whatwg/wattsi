@@ -13,6 +13,7 @@ Currently:
  * Strip out unused references
  * Spec splitting
  * Add caniuse.com annotations
+ * Add output for `<wpt>` elements
  * Add syntax-highlighting markup to `<pre>` contents
 
 ## Wattsi Syntax

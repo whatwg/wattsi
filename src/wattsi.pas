@@ -1848,6 +1848,39 @@ Result := False;
          Write(F, HTMLFragment);
    end;
 
+   procedure InsertWPTTestsBlock(const Element: TElement);
+   var
+      WPTPaths, WPTOutput: TStrings;
+      WPTPath, WPTSubPath, WPTFilename: String;
+      WPTPathPrefix: String = '/html/';
+   begin
+      if (InSplit) then
+         exit;
+      if (Element.HasAttribute('pathprefix')) then
+         WPTPathPrefix := Trim(Element.GetAttribute('pathprefix').AsString);
+      WPTOutput := TStringList.Create;
+      WPTOutput.Add('<ul class=wpt-tests-block>');
+      WPTPaths := TStringList.Create;
+      WPTPaths.Text := Element.TextContent.AsString;
+      for WPTSubPath in WPTPaths do
+      begin
+         if (Trim(WPTSubPath) = '') then
+            continue;
+         WPTPath := WPTPathPrefix + Trim(WPTSubPath);
+         WPTFilename := ExtractFileName(WPTPath);
+         WPTOutput.Add('<li class=wpt-test>');
+         WPTOutput.Add('<a href="https://wpt.fyi/results'
+            + WPTPath + '">' + WPTFilename + '</a>');
+         WPTOutput.Add('<a href="http://web-platform-tests.live'
+            + WPTPath + '"><small>(live test)</small></a>');
+         WPTOutput.Add('<a href="https://github.com/web-platform-tests/wpt/blob/master'
+            + WPTPath + '"><small>(source)</small></a>');
+         WPTOutput.Add('</li>');
+      end;
+      WPTOutput.Add('</ul>');
+      Write(F, WPTOutput.Text);
+   end;
+
    procedure WalkIn(const Element: TElement);
    var
       IsExcluder, Skip, NotFirstAttribute: Boolean;
@@ -1940,6 +1973,8 @@ Result := False;
       // behind the (now-empty) pre parents of the <code class="idl"> elements.
       if Element.IsIdentity(nsHTML, ePre) and (Element.TextContent.AsString = '') then
          exit;
+      if (Element.LocalName.AsString = 'wpt') then
+         exit;
       if (InSplit and Element.HasAttribute(kExcludingAttribute[vSplit])) then
          exit;
       IsExcluder := DetermineIsExcluder(Element, AttributeCount);
@@ -1994,6 +2029,7 @@ var
    Current: TNode;
    ClassValue: String = '';
    Element: TElement;
+   Style: TElement;
 begin
    Assign(F, FileName);
    Rewrite(F);
@@ -2015,6 +2051,41 @@ begin
       if (Current is TElement) then
       begin
          Element := TElement(Current);
+         // TODO: Move the styles below to https://resources.whatwg.org/spec.css or
+         // https://resources.whatwg.org/standard.css and remove the following
+         // before merging this patch.
+         if (Element.IsIdentity(nsHTML, eHead)) then
+         begin
+            Style := E(eStyle,
+               [T(
+'.wpt-tests-block {'
++ '  list-style: none;'
++ '  border-left: .5em solid hsl(290, 70%, 60%);'
++ '  background: hsl(290, 70%, 95%);'
++ '  margin: 1em auto;'
++ '  padding: .5em;'
++ '  display: grid;'
++ '  grid-template-columns: 1fr auto auto;'
++ '  grid-column-gap: .5em;'
++ '}'
++ '.wpt-tests-block::before {'
++ '  content: "Tests";'
++ '  grid-column: 1/-1;'
++ '  color: hsl(290, 70%, 30%);'
++ '  text-transform: uppercase;'
++ '}'
++ '.wpt-test {'
++ '  display: contents;'
++ '}'
+)]);
+            Element.AppendChild(Style);
+         end;
+         if (Element.LocalName.AsString = 'wpt') then
+         begin
+            InsertWPTTestsBlock(Element);
+            WalkToNextSkippingChildren(Current, Document, @WalkOut);
+            continue;
+         end;
          if (Element.HasAttribute('class')) then
             ClassValue := Element.GetAttribute('class').AsString;
          if (IsHighlighterTarget(Element, ClassValue)) then
