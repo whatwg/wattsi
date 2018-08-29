@@ -59,6 +59,7 @@ type
 
 var
    HighlighterOutputByJSONContents: TStringMap;
+   CurrentVariant: TAllVariants;
 
 const
    kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap', 'review');
@@ -1854,7 +1855,7 @@ Result := False;
       WPTPath, WPTSubPath, WPTFilename: String;
       WPTPathPrefix: String = '/html/';
    begin
-      if (InSplit) then
+      if (CurrentVariant = vDev) then
          exit;
       if (Element.HasAttribute('pathprefix')) then
          WPTPathPrefix := Trim(Element.GetAttribute('pathprefix').AsString);
@@ -2741,6 +2742,7 @@ begin
                begin
                   for Variant in TVariants do
                   begin
+                     CurrentVariant := Variant;
                      if (Variant = vReview) then
                      begin
                         continue;
