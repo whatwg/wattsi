@@ -1852,7 +1852,7 @@ Result := False;
    procedure InsertWPTTestsBlock(const Element: TElement);
    var
       WPTPaths, WPTOutput: TStrings;
-      WPTPath, WPTSubPath, WPTFilename: String;
+      WPTPath, WPTSubPath, WPTLiveURLScheme, WPTFilename: String;
       WPTPathPrefix: String = '/html/';
    begin
       if (CurrentVariant = vDev) then
@@ -1865,14 +1865,18 @@ Result := False;
       WPTPaths.Text := Element.TextContent.AsString;
       for WPTSubPath in WPTPaths do
       begin
+         WPTLiveURLScheme := 'http';
          if (Trim(WPTSubPath) = '') then
             continue;
          WPTPath := WPTPathPrefix + Trim(WPTSubPath);
          WPTFilename := ExtractFileName(WPTPath);
+         if (AnsiContainsStr(WPTFilename, '.https.')
+               or AnsiContainsStr(WPTFilename, '.serviceworker.')) then
+            WPTLiveURLScheme := 'https';
          WPTOutput.Add('<li class=wpt-test>');
          WPTOutput.Add('<a href="https://wpt.fyi/results'
             + WPTPath + '">' + WPTFilename + '</a>');
-         WPTOutput.Add('<a href="http://web-platform-tests.live'
+         WPTOutput.Add('<a href="' + WPTLiveURLScheme + '://web-platform-tests.live'
             + WPTPath + '"><small>(live test)</small></a>');
          WPTOutput.Add('<a href="https://github.com/web-platform-tests/wpt/blob/master'
             + WPTPath + '"><small>(source)</small></a>');
