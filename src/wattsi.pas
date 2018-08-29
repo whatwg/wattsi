@@ -1855,7 +1855,7 @@ Result := False;
       WPTPath, WPTSubPath, WPTLiveURLScheme, WPTFilename: String;
       WPTPathPrefix: String = '/html/';
    begin
-      if (CurrentVariant = vDev) then
+      if ((CurrentVariant = vDev) or (CurrentVariant = vReview)) then
          exit;
       if (Element.HasAttribute('pathprefix')) then
          WPTPathPrefix := Trim(Element.GetAttribute('pathprefix').AsString);
