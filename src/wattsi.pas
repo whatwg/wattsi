@@ -1860,7 +1860,9 @@ Result := False;
       if (Element.HasAttribute('pathprefix')) then
          WPTPathPrefix := Trim(Element.GetAttribute('pathprefix').AsString);
       WPTOutput := TStringList.Create;
-      WPTOutput.Add('<ul class=wpt-tests-block>');
+      WPTOutput.Add('<div class=wpt-tests-block>');
+      WPTOutput.Add('<input onclick="toggleStatus(this)" value="⋰" type="button">');
+      WPTOutput.Add('<dl>');
       WPTPaths := TStringList.Create;
       WPTPaths.Text := Element.TextContent.AsString;
       for WPTSubPath in WPTPaths do
@@ -1873,16 +1875,17 @@ Result := False;
          if (AnsiContainsStr(WPTFilename, '.https.')
                or AnsiContainsStr(WPTFilename, '.serviceworker.')) then
             WPTLiveURLScheme := 'https';
-         WPTOutput.Add('<li class=wpt-test>');
-         WPTOutput.Add('<a href="https://wpt.fyi/results'
-            + WPTPath + '">' + WPTFilename + '</a>');
-         WPTOutput.Add('<a href="' + WPTLiveURLScheme + '://web-platform-tests.live'
-            + WPTPath + '"><small>(live test)</small></a>');
-         WPTOutput.Add('<a href="https://github.com/web-platform-tests/wpt/blob/master'
-            + WPTPath + '"><small>(source)</small></a>');
-         WPTOutput.Add('</li>');
+         WPTOutput.Add('<dt>');
+         WPTOutput.Add('<a title="' + WPTFilename + '"'
+            + ' href="https://wpt.fyi/results'
+            + WPTPath + '">' + WPTFilename + '</a></dt>');
+         WPTOutput.Add('<dd><a href="' + WPTLiveURLScheme + '://web-platform-tests.live'
+            + WPTPath + '">(live test)</a>');
+         WPTOutput.Add(' <a href="https://github.com/web-platform-tests/wpt/blob/master'
+            + WPTPath + '">(source)</a></dd>');
       end;
-      WPTOutput.Add('</ul>');
+      WPTOutput.Add('</dl>');
+      WPTOutput.Add('</div>');
       Write(F, WPTOutput.Text);
    end;
 
@@ -2064,23 +2067,48 @@ begin
             Style := E(eStyle,
                [T(
 '.wpt-tests-block {'
-+ '  list-style: none;'
-+ '  border-left: .5em solid hsl(290, 70%, 60%);'
 + '  background: hsl(290, 70%, 95%);'
 + '  margin: 1em auto;'
-+ '  padding: .5em;'
-+ '  display: grid;'
-+ '  grid-template-columns: 1fr auto auto;'
-+ '  grid-column-gap: .5em;'
++ '  padding: .7em;'
++ '  width: 136px;'
++ '  font-size: 11px;'
++ '  position: absolute;'
++ '  right: 4.8px;'
++ '  z-index: 9;'
++ '  box-shadow: 0 0 3px #999'
 + '}'
-+ '.wpt-tests-block::before {'
++ '.wpt-tests-block dl::before {'
 + '  content: "Tests";'
-+ '  grid-column: 1/-1;'
 + '  color: hsl(290, 70%, 30%);'
 + '  text-transform: uppercase;'
 + '}'
-+ '.wpt-test {'
-+ '  display: contents;'
++ '.wpt-tests-block dt {'
++ '  font-weight: normal;'
++ '  overflow: hidden;'
++ '  text-overflow: ellipsis;'
++ '  margin: 0;'
++ '}'
++ '.wpt-tests-block dt:first-child {'
++ '  margin-top: 2px;'
++ '}'
++ '.wpt-tests-block dd {'
++ '  margin-left: 20px;'
++ '  line-height: 1em;'
++ '  margin-bottom: 4px;'
++ '}'
++ '.wpt-tests-block > input {'
++ '  position: absolute;'
++ '  left: 0;'
++ '  top: 0;'
++ '  width: 1em;'
++ '  height: 1em;'
++ '  border: none;'
++ '  background: transparent;'
++ '  padding: 0;'
++ '  margin: 0;'
++ '}'
++ '.wpt-tests-block.wrapped > :not(input) {'
++ '  display: none;'
 + '}'
 )]);
             Element.AppendChild(Style);
