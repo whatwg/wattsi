@@ -2037,7 +2037,6 @@ var
    Current: TNode;
    ClassValue: String = '';
    Element: TElement;
-   Style: TElement;
 begin
    Assign(F, FileName);
    Rewrite(F);
@@ -2059,60 +2058,6 @@ begin
       if (Current is TElement) then
       begin
          Element := TElement(Current);
-         // TODO: Move the styles below to https://resources.whatwg.org/spec.css or
-         // https://resources.whatwg.org/standard.css and remove the following
-         // before merging this patch.
-         if (Element.IsIdentity(nsHTML, eHead)) then
-         begin
-            Style := E(eStyle,
-               [T(
-'.wpt-tests-block {'
-+ '  background: hsl(290, 70%, 95%);'
-+ '  margin: 1em auto;'
-+ '  padding: .7em;'
-+ '  width: 136px;'
-+ '  font-size: 11px;'
-+ '  position: absolute;'
-+ '  right: 4.8px;'
-+ '  z-index: 9;'
-+ '  box-shadow: 0 0 3px #999'
-+ '}'
-+ '.wpt-tests-block dl::before {'
-+ '  content: "Tests";'
-+ '  color: hsl(290, 70%, 30%);'
-+ '  text-transform: uppercase;'
-+ '}'
-+ '.wpt-tests-block dt {'
-+ '  font-weight: normal;'
-+ '  overflow: hidden;'
-+ '  text-overflow: ellipsis;'
-+ '  margin: 0;'
-+ '}'
-+ '.wpt-tests-block dt:first-child {'
-+ '  margin-top: 2px;'
-+ '}'
-+ '.wpt-tests-block dd {'
-+ '  margin-left: 20px;'
-+ '  line-height: 1em;'
-+ '  margin-bottom: 4px;'
-+ '}'
-+ '.wpt-tests-block > input {'
-+ '  position: absolute;'
-+ '  left: 0;'
-+ '  top: 0;'
-+ '  width: 1em;'
-+ '  height: 1em;'
-+ '  border: none;'
-+ '  background: transparent;'
-+ '  padding: 0;'
-+ '  margin: 0;'
-+ '}'
-+ '.wpt-tests-block.wrapped > :not(input) {'
-+ '  display: none;'
-+ '}'
-)]);
-            Element.AppendChild(Style);
-         end;
          if (Element.LocalName.AsString = 'wpt') then
          begin
             InsertWPTTestsBlock(Element);
