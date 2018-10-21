@@ -59,6 +59,7 @@ type
 
 var
    HighlighterOutputByJSONContents: TStringMap;
+   CurrentVariant: TAllVariants;
 
 const
    kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap', 'review');
@@ -1862,6 +1863,46 @@ Result := False;
          Write(F, HTMLFragment);
    end;
 
+   procedure InsertWPTTestsBlock(const Element: TElement);
+   var
+      WPTPaths, WPTOutput: TStrings;
+      WPTPath, WPTSubPath, WPTLiveURLScheme, WPTFilename: String;
+      WPTPathPrefix: String = '/html/';
+   begin
+      if ((CurrentVariant = vDev) or (CurrentVariant = vReview)) then
+         exit;
+      if (Element.HasAttribute('pathprefix')) then
+         WPTPathPrefix := Trim(Element.GetAttribute('pathprefix').AsString);
+      WPTOutput := TStringList.Create;
+      WPTOutput.Add('<div class=wpt-tests-margin>');
+      WPTOutput.Add('<input onclick="toggleStatus(this)" value="⋰" type="button">');
+      WPTOutput.Add('<dl>');
+      WPTPaths := TStringList.Create;
+      WPTPaths.Text := Element.TextContent.AsString;
+      for WPTSubPath in WPTPaths do
+      begin
+         WPTLiveURLScheme := 'http';
+         if (Trim(WPTSubPath) = '') then
+            continue;
+         WPTPath := WPTPathPrefix + Trim(WPTSubPath);
+         WPTFilename := ExtractFileName(WPTPath);
+         if (AnsiContainsStr(WPTFilename, '.https.')
+               or AnsiContainsStr(WPTFilename, '.serviceworker.')) then
+            WPTLiveURLScheme := 'https';
+         WPTOutput.Add('<dt>');
+         WPTOutput.Add('<a title="' + WPTFilename + '"'
+            + ' href="https://wpt.fyi/results'
+            + WPTPath + '">' + WPTFilename + '</a></dt>');
+         WPTOutput.Add('<dd><a href="' + WPTLiveURLScheme + '://web-platform-tests.live'
+            + WPTPath + '">(live test)</a>');
+         WPTOutput.Add(' <a href="https://github.com/web-platform-tests/wpt/blob/master'
+            + WPTPath + '">(source)</a></dd>');
+      end;
+      WPTOutput.Add('</dl>');
+      WPTOutput.Add('</div>');
+      Write(F, WPTOutput.Text);
+   end;
+
    procedure WalkIn(const Element: TElement);
    var
       IsExcluder, Skip, NotFirstAttribute: Boolean;
@@ -1954,6 +1995,8 @@ Result := False;
       // behind the (now-empty) pre parents of the <code class="idl"> elements.
       if Element.IsIdentity(nsHTML, ePre) and (Element.TextContent.AsString = '') then
          exit;
+      if (Element.LocalName.AsString = 'wpt') then
+         exit;
       if (InSplit and Element.HasAttribute(kExcludingAttribute[vSplit])) then
          exit;
       IsExcluder := DetermineIsExcluder(Element, AttributeCount);
@@ -2029,6 +2072,12 @@ begin
       if (Current is TElement) then
       begin
          Element := TElement(Current);
+         if (Element.LocalName.AsString = 'wpt') then
+         begin
+            InsertWPTTestsBlock(Element);
+            WalkToNextSkippingChildren(Current, Document, @WalkOut);
+            continue;
+         end;
          if (Element.HasAttribute('class')) then
             ClassValue := Element.GetAttribute('class').AsString;
          if (IsHighlighterTarget(Element, ClassValue)) then
@@ -2684,6 +2733,7 @@ begin
                begin
                   for Variant in TVariants do
                   begin
+                     CurrentVariant := Variant;
                      if (Variant = vReview) then
                      begin
                         continue;

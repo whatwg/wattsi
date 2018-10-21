@@ -14,6 +14,7 @@ Currently:
  * Check for missing references
  * Spec splitting
  * Add caniuse.com annotations
+ * Add output for `<wpt>` elements
  * Add syntax-highlighting markup to `<pre>` contents
 
 ## Wattsi Syntax
