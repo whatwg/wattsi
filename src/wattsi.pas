@@ -1860,7 +1860,7 @@ Result := False;
       if (Element.HasAttribute('pathprefix')) then
          WPTPathPrefix := Trim(Element.GetAttribute('pathprefix').AsString);
       WPTOutput := TStringList.Create;
-      WPTOutput.Add('<div class=wpt-tests-block>');
+      WPTOutput.Add('<div class=wpt-tests-margin>');
       WPTOutput.Add('<input onclick="toggleStatus(this)" value="⋰" type="button">');
       WPTOutput.Add('<dl>');
       WPTPaths := TStringList.Create;
