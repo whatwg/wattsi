@@ -56,9 +56,12 @@ type
    TAllVariants = (vHTML, vDEV, vSnap, vReview, vSplit);
    TVariants = vHTML..vReview;
    TStringMap = specialize THashTable <UTF8String, UTF8String, UTF8StringUtils>;
+   TMDNBrowsers = specialize TFPGMap <UTF8String, UTF8String>; // preserves order
 
 var
    HighlighterOutputByJSONContents: TStringMap;
+   MDNJSONData: TJSON;
+   MDNBrowsers: TMDNBrowsers;
    CurrentVariant: TAllVariants;
 
 const
@@ -142,6 +145,158 @@ begin
          or AnsiContainsStr(ClassValue, 'js')
          or AnsiContainsStr(ClassValue, 'html')
          or AnsiContainsStr(ClassValue, 'abnf')));
+end;
+
+function HasAncestor(Element: TNode; const TestNamespaceURL, TestLocalName: TCanonicalString): Boolean;
+begin
+   repeat
+      Element := Element.ParentNode;
+      if (not (Element is TElement)) then
+      begin
+         Result := False;
+         exit;
+      end;
+   until (TElement(Element).IsIdentity(TestNamespaceURL, TestLocalName));
+   Result := True;
+end;
+
+procedure AddMDNBrowserRow(const SupportTable: TElement;
+                           const BrowserID: UTF8String;
+                           const YesNoUnknown: UTF8String;
+                           const Version: UTF8String;
+                           const Document: TDocument);
+var
+   YNU, YNULowercase: UTF8String;
+   BrowserRow: TElement;
+begin
+   YNU := YesNoUnknown;
+   YNULowercase := LowerCase(YesNoUnknown);
+   if (YNU = 'Unknown') then
+      YNU := '?';
+   BrowserRow := E(eSpan, ['class', BrowserID + ' ' + YNULowercase], Document);
+   BrowserRow.AppendChild(E(eSpan, [T(MDNBrowsers[BrowserID], Document)]));
+   if (Version = '') then
+      BrowserRow.AppendChild(E(eSpan, [T(YNU, Document)]))
+   else
+      BrowserRow.AppendChild(E(eSpan, [T(Version, Document)]));
+   SupportTable.AppendChild(BrowserRow);
+end;
+
+procedure ProcessBrowserData(const BrowserID: UTF8String;
+                             const VersionData: TJSONObject;
+                             const SupportTable: TElement;
+                             const Document: TDocument);
+var
+   VersionAdded: TJSON;
+begin
+   if (Assigned(VersionData['version_removed'])) then
+      AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document)
+   else
+   begin
+      VersionAdded := VersionData['version_added'];
+      if (not(Assigned(VersionAdded))) then
+         AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '', Document)
+      else
+      if (VersionAdded is TJSONBoolean) then
+      begin
+         if TJSONBoolean(VersionAdded) then
+            AddMDNBrowserRow(SupportTable, BrowserID, 'Yes', '', Document)
+         else
+            AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document);
+      end
+      else
+      if (VersionAdded is TJSONString) then
+         AddMDNBrowserRow(SupportTable, BrowserID, 'Yes',
+                          UTF8String(VersionAdded) + '+', Document)
+   end;
+end;
+
+procedure AddMDNBox(const MDNBox: TElement;
+                    const ID: UTF8String;
+                    const Document: TDocument);
+var
+   MDNData, MDNSupport: TJSONObject;
+   MDNButton, MDNDiv, MDNDetails, SupportTable: TElement;
+   MDNSlug, MDNSubpath, MDNTitle, MDNSummary, BrowserID: UTF8String;
+   i, j: Integer;
+const
+   kMDNURLBase = 'https://developer.mozilla.org/en-US/docs/Web/';
+begin
+   // Add an ellipses button unless one has already been added.
+   if (not((MDNBox.FirstChild is TElement)
+         and TElement(MDNBox.FirstChild).IsIdentity(nsHTML, eInput))) then
+   begin
+      MDNButton := E(eInput, ['onclick', 'toggleStatus(this)',
+                     'value', '⋰', 'type', 'button']);
+      MDNBox.AppendChild(MDNButton);
+   end;
+   // Get the MDN details for this annotation.
+   for MDNData in TJSONArray(MDNJSONData[ID]) do
+   begin
+      // MDNJSONData[ID] is an array of objects, where each object has data
+      // associated with a particular MDN article which links to the given ID in
+      // the HTML spec. We loop through those objects and assign each to an
+      // MDNData, which contains data for a particular MDN article: the article
+      // path, article summary, browser-support data, and article title.
+      //
+      // Example showing the structure of the JSON data:
+      //
+      // "sharedworker": [                                <= HTML spec ID
+      //  {
+      //    "slug":    "API/SharedWorker",                <= MDN article slug
+      //    "summary": "The SharedWorker interface ..."   <= MDN article summary
+      //    "support": {"chrome":{"version_added":"4"},.. <= MDN support data
+      //    },
+      //    "title":   "SharedWorker"                     <= MDN article title
+      //  },
+      //  {
+      //    /* data from another MDN article associated with this spec ID */
+      //  }
+      // ],
+      //
+      // Note that, in the browser-support data, the value for a particular
+      // browser-ID key (e.g., "chrome") can optionally be an array of objects
+      // (instead of just a single object as shown in example above).
+      // See https://goo.gl/uejWa4 for documentation on the structure.
+      MDNSlug := MDNData['slug'];
+      MDNSummary := MDNData['summary'];
+      MDNTitle := MDNData['title'];
+      MDNSubpath := Copy(MDNSlug, Pos('/', MDNSlug) + 1);
+      MDNDiv := E(eDiv);
+      MDNDiv.AppendChild(E(eB, [T('MDN')]));
+      MDNDiv.AppendChild(T(' '));
+      MDNDetails := E(eDetails);
+      MDNDetails.AppendChild(E(eSummary, [
+         E(eA, ['href', kMDNURLBase + MDNSlug, 'title', MDNSummary],
+            Document, [T(MDNSubpath, Document)])]));
+      MDNDiv.AppendChild(MDNDetails);
+      MDNBox.AppendChild(MDNDiv);
+      if (MDNData.Length = 3) then
+      begin
+         SupportTable := E(eP, ['class', 'nosupportdata']);
+         SupportTable.AppendChild(T('No support data.'));
+         MDNDetails.AppendChild(SupportTable);
+         continue;
+      end;
+      MDNSupport := MDNData['support'];
+      SupportTable := E(eP, ['class', 'mdnsupport']);
+      MDNDetails.AppendChild(SupportTable);
+      for i := 0 to MDNBrowsers.Count - 1 do
+      begin
+         BrowserID := MDNBrowsers.Keys[i];
+         if (not(Assigned(MDNSupport[BrowserID]))) then
+            AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '', Document)
+         else
+         if (MDNSupport[BrowserID] is TJSONArray) then
+            // MDN support data for a given browser can be an array of objects.
+            for j := 0 to MDNSupport[BrowserID].Length - 1 do
+               ProcessBrowserData(BrowserID, MDNSupport[BrowserID][j],
+                                  SupportTable, Document)
+         else
+            ProcessBrowserData(BrowserID, MDNSupport[BrowserID],
+                               SupportTable, Document);
+      end;
+   end;
 end;
 
 procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement; const SourceGitSHA: AnsiString);
@@ -620,6 +775,70 @@ var
          CrossReferences.Last := CrossRefListNode;
          CrossReferences.DFNs[CrossReferenceName] := DFNEntry;
       end;
+   end;
+
+   procedure InsertMDNAnnotationForElement(const Element: TElement);
+   var
+      Candidate: TNode;
+      ID: UTF8String;
+      TargetAncestor, MDNBefore, MDNBox: TElement;
+      TargetAncestorType: TCanonicalString;
+   begin
+      if (HasAncestor(Element, nsHTML, eP)) then
+         // Annotations for elements with p ancestors are handled later.
+         exit;
+      if (not(Element.HasAttribute('id'))) then
+         exit;
+      ID := Element.GetAttribute('id').AsString;
+      if (not(MDNJSONData[ID] is TJSONArray)) then
+         // No MDN article has a link to this ID.
+         exit;
+      MDNBox := E(eAside, ['class', 'mdn']);
+      MDNBefore := E(eAside, ['class', 'mdn before']);
+      Candidate := Element;
+      if (HasAncestor(Element, nsHTML, ePre)
+            or HasAncestor(Element, nsHTML, eTable)
+            or HasAncestor(Element, nsHTML, eDL)) then
+      begin
+         if (HasAncestor(Element, nsHTML, ePre)) then
+            TargetAncestorType := ePre
+         else if (HasAncestor(Element, nsHTML, eTable)) then
+            TargetAncestorType := eTable
+         else if (HasAncestor(Element, nsHTML, eDL)) then
+            TargetAncestorType := eDL;
+         Candidate := Element;
+         repeat
+            Candidate := Candidate.ParentNode;
+            if (not (Candidate is TElement)) then
+               exit;
+         until (TElement(Candidate).IsIdentity(nsHTML, TargetAncestorType));
+         TargetAncestor := TElement(Candidate);
+         if ((TargetAncestor.PreviousSibling is TElement)
+               and (TElement(TargetAncestor.PreviousSibling)
+                  .GetAttribute('class').AsString = 'mdn before')) then
+            // If there's already an MDN box at the point where we want this,
+            // then just re-use it (instead of creating another one).
+            MDNBefore := TElement(TargetAncestor.PreviousSibling)
+         else
+            TElement(TargetAncestor.ParentNode)
+               .InsertBefore(MDNBefore, TargetAncestor);
+         MDNBox := MDNBefore;
+      end
+      else
+      begin
+         // Otherwise insert the annotation after the element being annotated.
+         // Headings are the only existing cases where we reach here.
+         if ((Element.NextSibling is TElement)
+               and ((Element.NextSibling as TElement)
+                  .GetAttribute('class').AsString = 'mdn')) then
+            // If there's already an MDN box at the point where we want this,
+            // then just re-use it (instead of creating another one).
+            MDNBox := Element.NextSibling as TElement
+         else
+            (Element.ParentNode as TElement)
+               .InsertBefore(MDNBox, Element.NextSibling);
+      end;
+      AddMDNBox(MDNBox, ID, Document);
    end;
 
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
@@ -1130,6 +1349,8 @@ var
 
    procedure ProcessNodeExit(const Node: TElement);
    begin
+      if (CurrentVariant <> vReview) then
+         InsertMDNAnnotationForElement(Node);
       if (Node = InHeading) then
          InHeading := nil
       else
@@ -1157,19 +1378,6 @@ var
          else
             Done := not WalkToNext(Current, Document, @ProcessNodeExit);
       until Done;
-   end;
-
-   function HasAncestor(Element: TNode; const TestNamespaceURL, TestLocalName: TCanonicalString): Boolean;
-   begin
-      repeat
-         Element := Element.ParentNode;
-         if (not (Element is TElement)) then
-         begin
-            Result := False;
-            exit;
-         end;
-      until (TElement(Element).IsIdentity(TestNamespaceURL, TestLocalName));
-      Result := True;
    end;
 
    procedure InsertAnnotations();
@@ -1903,6 +2111,45 @@ Result := False;
       Write(F, WPTOutput.Text);
    end;
 
+   procedure InsertMDNAnnotationForElementWithPAncestor(const Element: TElement);
+   var
+      Candidate: TNode;
+      ID: UTF8String;
+      PElement, MDNBox: TElement;
+   begin
+      // In order to minimize the cases where an annotation overlaps with the
+      // spec text, annotations for elements with p ancestors are handled
+      // separately here. The annotations are inserted after the p-element
+      // ancestor of the element being annotated.
+      if ((CurrentVariant = vHTML) and InSplit) then
+         // MDN annotations have already been inserted in this case.
+         exit;
+      if (not(Element.HasAttribute('id'))) then
+         exit;
+      ID := Element.GetAttribute('id').AsString;
+      if (not(MDNJSONData[ID] is TJSONArray)) then
+         // No MDN article has a link to this ID.
+         exit;
+      MDNBox := E(eAside, ['class', 'mdn']);
+      Candidate := Element;
+      repeat
+         Candidate := Candidate.ParentNode;
+         if (not (Candidate is TElement)) then
+            exit;
+      until (TElement(Candidate).IsIdentity(nsHTML, eP));
+      PElement := TElement(Candidate);
+      if ((PElement.NextSibling is TElement)
+            and (TElement(PElement.NextSibling)
+               .GetAttribute('class').AsString = 'mdn')) then
+         // If there's already an MDN box at the point where we want this,
+         // then just re-use it (instead of creating another one).
+         MDNBox := TElement(PElement.NextSibling)
+      else
+         TElement(PElement.ParentNode)
+            .InsertBefore(MDNBox, PElement.NextSibling);
+      AddMDNBox(MDNBox, ID, Document);
+   end;
+
    procedure WalkIn(const Element: TElement);
    var
       IsExcluder, Skip, NotFirstAttribute: Boolean;
@@ -2045,6 +2292,13 @@ Result := False;
          CurrentElement := TElement(Element.ParentNode)
       else
          CurrentElement := nil;
+   if (HasAncestor(Element, nsHTML, eP)) then
+      // Elements other than those with p ancestors are handled earlier.
+      // Elements with p ancestors are handled here because the annotations need
+      // to be inserted after the end tag for the p element has been emitted.
+      // Otherwise the annotation ends up getting inserted within the p element.
+      if (CurrentVariant <> vReview) then
+         InsertMDNAnnotationForElementWithPAncestor(Element);
    end;
 
 var
@@ -2636,18 +2890,18 @@ begin
       Quiet := true;
       ParamOffset := 1;
    end;
-   if (ParamCount() <> 5) then
-      if (ParamCount() = 6) then
+   if (ParamCount() <> 6) then
+      if (ParamCount() = 7) then
       begin
          if (not Quiet) then
          begin
-            HighlightServerURL := ParamStr(6);
+            HighlightServerURL := ParamStr(7);
          end
       end
       else
-      if ((ParamCount() = 7) and Quiet) then
+      if ((ParamCount() = 8) and Quiet) then
       begin
-         HighlightServerURL := ParamStr(7);
+         HighlightServerURL := ParamStr(8);
       end
       else
       if ((ParamCount() = 1) and (ParamStr(1) = '--version')) then
@@ -2659,7 +2913,7 @@ begin
       begin
          Writeln('wattsi: invalid arguments');
          Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> [<highlight-server-url>]');
+         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <mdn-spec-links/html.json> [<highlight-server-url>]');
          Writeln('  wattsi --version');
          exit;
       end;
@@ -2676,6 +2930,28 @@ begin
    end;
    Features := TFeatureMap.Create(@UTF8StringHash32);
    try
+      Inform('Parsing MDN data...');
+      MDNJSONData := ParseJSON(ReadTextFile(ParamStr(6 + ParamOffset)));
+      MDNBrowsers := TMDNBrowsers.Create;
+      // The browser IDs here must match the ones in the imported JSON data.
+      // See the list of browser IDs at https://goo.gl/iDacWP.
+      MDNBrowsers['chrome'] := 'Chrome';
+      MDNBrowsers['chrome_android'] := 'Chrome Android';
+      MDNBrowsers['edge'] := 'Edge';
+      MDNBrowsers['edge_mobile'] := 'Edge Mobile';
+      MDNBrowsers['firefox'] := 'Firefox';
+      MDNBrowsers['firefox_android'] := 'Firefox Android';
+      MDNBrowsers['ie'] := 'Internet Explorer';
+      // MDNBrowsers['nodejs'] := 'Node.js'; // no data for features in HTML
+      MDNBrowsers['opera'] := 'Opera';
+      MDNBrowsers['opera_android'] := 'Opera Android';
+      // MDNBrowsers['qq_android'] := 'QQ Browser'; // not enough data for features in HTML
+      MDNBrowsers['safari'] := 'Safari';
+      MDNBrowsers['safari_ios'] := 'Safari iOS';
+      MDNBrowsers['samsunginternet_android'] := 'Samsung Internet';
+      // MDNBrowsers['uc_android'] := 'UC Browser'; // not enough data for features in HTML
+      // MDNBrowsers['uc_chinese_android'] := 'Chinese UC Browser'; // not enough data for features in HTML
+      MDNBrowsers['webview_android'] := 'WebView Android';
       PreProcessCanIUseData(ParamStr(5 + ParamOffset));
       {$IFDEF VERBOSE_PREPROCESSORS}
          if (Assigned(Features)) then
