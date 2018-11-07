@@ -791,25 +791,45 @@ var
 
       MDNBox := E(eAside, ['class', 'mdn before']);
 
-      // Find the furthest ancestor that is a direct child of <body>
-      Candidate := Element;
-      while not TElement(Candidate.ParentNode).IsIdentity(nsHTML, eBody) do
+      if (Element.HasProperties(propHeading)) then
       begin
-         Candidate := Candidate.ParentNode;
-      end;
-      TargetAncestor := TElement(Candidate);
-
-      if ((TargetAncestor.PreviousSibling is TElement)
-            and (TElement(TargetAncestor.PreviousSibling)
-               .GetAttribute('class').AsString = 'mdn before')) then
-      begin
-         // If there's already an MDN box at the point where we want this,
-         // then just re-use it (instead of creating another one).
-         MDNBox := TElement(TargetAncestor.PreviousSibling)
+         // If this is a heading, we insert the annotation after the element
+         // being annotated. When generating multipage output, inserting the
+         // annotation after the heading ensures that it ends up in the right
+         // file. It can otherwise incorrectly end up in the previous split.
+         MDNBox := E(eAside, ['class', 'mdn']);
+         if ((Element.NextSibling is TElement)
+               and ((Element.NextSibling as TElement)
+                  .GetAttribute('class').AsString = 'mdn')) then
+            // If there's already an MDN box at the point where we want this,
+            // then just re-use it (instead of creating another one).
+            MDNBox := Element.NextSibling as TElement
+         else
+            (Element.ParentNode as TElement)
+               .InsertBefore(MDNBox, Element.NextSibling);
       end
       else
       begin
-         TElement(TargetAncestor.ParentNode).InsertBefore(MDNBox, TargetAncestor);
+         // Find the furthest ancestor that is a direct child of <body>
+         Candidate := Element;
+         while not TElement(Candidate.ParentNode).IsIdentity(nsHTML, eBody) do
+         begin
+            Candidate := Candidate.ParentNode;
+         end;
+         TargetAncestor := TElement(Candidate);
+
+         if ((TargetAncestor.PreviousSibling is TElement)
+               and (TElement(TargetAncestor.PreviousSibling)
+                  .GetAttribute('class').AsString = 'mdn before')) then
+         begin
+            // If there's already an MDN box at the point where we want this,
+            // then just re-use it (instead of creating another one).
+            MDNBox := TElement(TargetAncestor.PreviousSibling)
+         end
+         else
+         begin
+            TElement(TargetAncestor.ParentNode).InsertBefore(MDNBox, TargetAncestor);
+         end;
       end;
 
       AddMDNBox(MDNBox, ID, Document);
