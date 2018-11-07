@@ -782,6 +782,9 @@ var
       ID: UTF8String;
       TargetAncestor, MDNBox: TElement;
    begin
+      if (HasAncestor(Element, nsHTML, eP)) then
+         // Annotations for elements with p ancestors are handled later.
+         exit;
       if (not(Element.HasAttribute('id'))) then
          exit;
       ID := Element.GetAttribute('id').AsString;
@@ -2105,6 +2108,45 @@ Result := False;
       Write(F, WPTOutput.Text);
    end;
 
+   procedure InsertMDNAnnotationForElementWithPAncestor(const Element: TElement);
+   var
+      Candidate: TNode;
+      ID: UTF8String;
+      PElement, MDNBox: TElement;
+   begin
+      // In order to minimize the cases where an annotation overlaps with the
+      // spec text, annotations for elements with p ancestors are handled
+      // separately here. The annotations are inserted after the p-element
+      // ancestor of the element being annotated.
+      if ((CurrentVariant = vHTML) and InSplit) then
+         // MDN annotations have already been inserted in this case.
+         exit;
+      if (not(Element.HasAttribute('id'))) then
+         exit;
+      ID := Element.GetAttribute('id').AsString;
+      if (not(MDNJSONData[ID] is TJSONArray)) then
+         // No MDN article has a link to this ID.
+         exit;
+      MDNBox := E(eAside, ['class', 'mdn']);
+      Candidate := Element;
+      repeat
+         Candidate := Candidate.ParentNode;
+         if (not (Candidate is TElement)) then
+            exit;
+      until (TElement(Candidate).IsIdentity(nsHTML, eP));
+      PElement := TElement(Candidate);
+      if ((PElement.NextSibling is TElement)
+            and (TElement(PElement.NextSibling)
+               .GetAttribute('class').AsString = 'mdn')) then
+         // If there's already an MDN box at the point where we want this,
+         // then just re-use it (instead of creating another one).
+         MDNBox := TElement(PElement.NextSibling)
+      else
+         TElement(PElement.ParentNode)
+            .InsertBefore(MDNBox, PElement.NextSibling);
+      AddMDNBox(MDNBox, ID, Document);
+   end;
+
    procedure WalkIn(const Element: TElement);
    var
       IsExcluder, Skip, NotFirstAttribute: Boolean;
@@ -2247,6 +2289,13 @@ Result := False;
          CurrentElement := TElement(Element.ParentNode)
       else
          CurrentElement := nil;
+   if (HasAncestor(Element, nsHTML, eP)) then
+      // Elements other than those with p ancestors are handled earlier.
+      // Elements with p ancestors are handled here because the annotations need
+      // to be inserted after the end tag for the p element has been emitted.
+      // Otherwise the annotation ends up getting inserted within the p element.
+      if (CurrentVariant <> vReview) then
+         InsertMDNAnnotationForElementWithPAncestor(Element);
    end;
 
 var
