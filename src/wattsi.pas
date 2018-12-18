@@ -782,45 +782,6 @@ var
       end;
    end;
 
-   procedure InsertMDNAnnotationForElement(const Element: TElement);
-   var
-      Candidate: TNode;
-      ID: UTF8String;
-      TargetAncestor, MDNBox: TElement;
-   begin
-      if (not(Element.HasAttribute('id'))) then
-         exit;
-      ID := Element.GetAttribute('id').AsString;
-      if (not(MDNJSONData[ID] is TJSONArray)) then
-         // No MDN article has a link to this ID.
-         exit;
-
-      MDNBox := E(eAside, ['class', 'mdn before wrapped']);
-
-      // Find the furthest ancestor that is a direct child of <body>
-      Candidate := Element;
-      while not TElement(Candidate.ParentNode).IsIdentity(nsHTML, eBody) do
-      begin
-         Candidate := Candidate.ParentNode;
-      end;
-      TargetAncestor := TElement(Candidate);
-
-      if ((TargetAncestor.PreviousSibling is TElement)
-            and (TElement(TargetAncestor.PreviousSibling)
-               .GetAttribute('class').AsString = 'mdn before')) then
-      begin
-         // If there's already an MDN box at the point where we want this,
-         // then just re-use it (instead of creating another one).
-         MDNBox := TElement(TargetAncestor.PreviousSibling)
-      end
-      else
-      begin
-         TElement(TargetAncestor.ParentNode).InsertBefore(MDNBox, TargetAncestor);
-      end;
-
-      AddMDNBox(MDNBox, ID, Document);
-   end;
-
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
    const
       CommitSnapshotBaseURL: AnsiString = '/commit-snapshots/';
@@ -1340,8 +1301,6 @@ var
 
    procedure ProcessNodeExit(const Node: TElement);
    begin
-      if (Variant <> vReview) then
-         InsertMDNAnnotationForElement(Node);
       if (Node = InHeading) then
          InHeading := nil
       else
@@ -2102,6 +2061,61 @@ Result := False;
       Write(F, WPTOutput.Text);
    end;
 
+   procedure InsertMDNAnnotationForElement(const Element: TElement);
+   var
+      ID, ClassName: UTF8String;
+      MDNBox, PotentialExistingBox: TElement;
+      InsertBeforeLocation: TNode;
+   begin
+      if ((CurrentVariant = vHTML) and InSplit) then
+         // MDN annotations have already been inserted in this case.
+         exit;
+      if (not(Element.HasAttribute('id'))) then
+         exit;
+      ID := Element.GetAttribute('id').AsString;
+      if (not(MDNJSONData[ID] is TJSONArray)) then
+         // No MDN article has a link to this ID.
+         exit;
+
+      MDNBox := E(eAside);
+
+      // Find the furthest ancestor that is a direct child of <body>
+      InsertBeforeLocation := Element;
+      while not TElement(InsertBeforeLocation.ParentNode).IsIdentity(nsHTML, eBody) do
+      begin
+         InsertBeforeLocation := InsertBeforeLocation.ParentNode;
+      end;
+
+      // For <p>s and headings, we want to insert after that ancestor:
+      // - For <p>s, we want to avoid overlapping the <p> contents.
+      // - For headings, we need to ensure that on any multipage splits, we end up in the correct file.
+      ClassName := 'mdn before wrapped';
+      PotentialExistingBox := InsertBeforeLocation.PreviousElementSibling();
+      if (TElement(InsertBeforeLocation).HasProperties(propHeading) or
+          TElement(InsertBeforeLocation).isIdentity(nsHTML, eP)) then
+      begin
+         ClassName := 'mdn wrapped';
+         PotentialExistingBox := InsertBeforeLocation.NextElementSibling();
+         InsertBeforeLocation := InsertBeforeLocation.NextSibling;
+      end;
+
+      // If there's already an MDN box at the point where we want this,
+      // then just re-use it (instead of creating another one).
+      if (Assigned(PotentialExistingBox) and
+          ((PotentialExistingBox.GetAttribute('class').AsString = 'mdn wrapped') or
+           (PotentialExistingBox.GetAttribute('class').AsString = 'mdn before wrapped'))) then
+      begin
+         MDNBox := PotentialExistingBox
+      end
+      else
+      begin
+         MDNBox.SetAttribute('class', ClassName);
+         TElement(InsertBeforeLocation.ParentNode).InsertBefore(MDNBox, InsertBeforeLocation);
+      end;
+
+      AddMDNBox(MDNBox, ID, Document);
+   end;
+
    procedure WalkIn(const Element: TElement);
    var
       IsExcluder, Skip, NotFirstAttribute: Boolean;
@@ -2255,6 +2269,8 @@ Result := False;
             CurrentlyInHighlightedElement := False;
          end;
       end;
+      if (CurrentVariant <> vReview) then
+         InsertMDNAnnotationForElement(Element);
       if (Element.ParentNode is TElement) then
          CurrentElement := TElement(Element.ParentNode)
       else
