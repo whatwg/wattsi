@@ -69,6 +69,8 @@ type
       function HasChildNodes(): Boolean; virtual;
       procedure Remove(); inline;
       function CloneNode(const Deep: Boolean = False): TNode; virtual; abstract;
+      function NextElementSibling(): TElement;
+      function PreviousElementSibling(): TElement;
       property ParentNode: TNode read FParentNode;
       property PreviousSibling: TNode read FPreviousSibling;
       property NextSibling: TNode read FNextSibling;
@@ -241,7 +243,7 @@ type
    // Caller will not use Element again, so feel free to e.g. free it, move it out of the DOM, whatever
 
 // These return False once the end (Top) is reached
-function WalkToNext(var Current: TNode; const Top: TNode; const WalkOutCallback: TWalkOutCallback): Boolean; //inline; 
+function WalkToNext(var Current: TNode; const Top: TNode; const WalkOutCallback: TWalkOutCallback): Boolean; //inline;
 function WalkToNextSkippingChildren(var Current: TNode; const Top: TNode; const WalkOutCallback: TWalkOutCallback): Boolean; //inline;
 
 type
@@ -311,6 +313,37 @@ begin
 end;
 
 
+function TNode.NextElementSibling(): TElement;
+var
+  Current: TNode;
+begin
+  Current := Self;
+  while (Assigned(Current)) do
+  begin
+    Current := Current.NextSibling;
+    if (Current is TElement) then
+    begin
+      Result := TElement(Current);
+      exit;
+    end;
+  end;
+end;
+
+function TNode.PreviousElementSibling(): TElement;
+var
+  Current: TNode;
+begin
+  Current := Self;
+  while (Assigned(Current)) do
+  begin
+    Current := Current.PreviousSibling;
+    if (Current is TElement) then
+    begin
+      Result := TElement(Current);
+      exit;
+    end;
+  end;
+end;
 
 function TDocument.TDocumentNodeList.GetLength(): Integer;
 begin
@@ -403,7 +436,7 @@ begin
       if (System.Length(FCommentsMiddle) > 0) then
          NewPreviousSibling := FCommentsMiddle[High(FCommentsMiddle)]
       else
-      if (Assigned(FDocType)) then   
+      if (Assigned(FDocType)) then
          NewPreviousSibling := FDocType
       else
       if (System.Length(FCommentsTop) > 0) then
@@ -431,7 +464,7 @@ begin
       if (System.Length(FCommentsMiddle) > 0) then
          NewNextSibling := FCommentsMiddle[0]
       else
-      if (Assigned(FDocumentElement)) then   
+      if (Assigned(FDocumentElement)) then
          NewNextSibling := FDocType
       else
       if (System.Length(FCommentsBottom) > 0) then
