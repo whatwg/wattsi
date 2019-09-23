@@ -1311,13 +1311,13 @@ var
             Result := ProcessNode(Node);
          end
          else
-         if ((Instruction = 'INSERT FINGERPRINT') and (Variant <> vDEV)) then
+         if ((Instruction = 'INSERT TRACKING') and (Variant <> vDEV)) then
          begin
-            TempElement := E(eSpan, [kCrossRefAttribute, 'fingerprinting vector',
-                                     'title', 'There is a potential fingerprinting vector here.',
-                                     'class', 'fingerprint'],
-                                    [E(eImg, ['src', 'https://resources.whatwg.org/fingerprint.svg',
-                                              'alt', '(This is a fingerprinting vector.)',
+            TempElement := E(eSpan, [kCrossRefAttribute, 'tracking vector',
+                                     'title', 'There is a tracking vector here.',
+                                     'class', 'tracking-vector'],
+                                    [E(eImg, ['src', 'https://resources.whatwg.org/tracking-vector.svg',
+                                              'alt', '(This is a tracking vector.)',
                                               'width', '46',
                                               'height', '64'])]);
             (Node.ParentNode as TElement).ReplaceChild(TempElement, Node);
