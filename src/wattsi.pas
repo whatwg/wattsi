@@ -817,6 +817,7 @@ var
 
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
    const
+      CommitSnapshotBaseURL: AnsiString = '/commit-snapshots/';
       SourceGitBaseURL: AnsiString = 'https://github.com/whatwg/html/commit/';
    var
       CandidateChild, SelectedForTransfer: TNode;
@@ -1168,6 +1169,15 @@ var
             if (Element.HasAttribute(kLTAttribute)) then
                Fail('<code> with lt="" found, use data-x="" instead; code is ' + Describe(Element));
             SaveCrossReference(Element);
+         end
+         else
+         if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('href').AsString = '/commit-snapshots/[SHA]')) then
+         begin
+            Scratch := Default(Rope);
+            Scratch.Append(@CommitSnapshotBaseURL);
+            Scratch.Append(@SourceGitSHA);
+            Scratch.Append('/');
+            Element.SetAttributeDestructively('href', Scratch);
          end
          else
          if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('class').AsString = 'sha-link') and (Variant = vSnap)) then
