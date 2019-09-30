@@ -1323,7 +1323,7 @@ var
 
    procedure ProcessNodeExit(const Node: TElement);
    begin
-      if (CurrentVariant <> vReview) then
+      if (Variant <> vReview) then
          InsertMDNAnnotationForElement(Node);
       if (Node = InHeading) then
          InHeading := nil
