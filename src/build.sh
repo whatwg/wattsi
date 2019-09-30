@@ -19,7 +19,9 @@ PATHS="-Fu${SRC}html -Fi${SRC}html -Fi${SRC}html/entities.inc"
 DEFINES="-dUSEROPES -dLINES -dPARSEERROR"
 
 echo "Writing $VERSION_FILE"
-(git rev-list --count HEAD || echo "0") > "$VERSION_FILE"
+# If you update the fallback below also update WATTSI_LATEST in
+# https://github.com/whatwg/html-build/blob/master/build.sh
+(git rev-list --count HEAD || echo "81") > "$VERSION_FILE"
 . ${SRC}lib/compile.sh
 echo "Removing $VERSION_FILE"
 rm "$VERSION_FILE"
