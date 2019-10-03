@@ -789,7 +789,7 @@ var
          // No MDN article has a link to this ID.
          exit;
 
-      MDNBox := E(eAside, ['class', 'mdn before']);
+      MDNBox := E(eAside, ['class', 'mdn before wrapped']);
 
       // Find the furthest ancestor that is a direct child of <body>
       Candidate := Element;
