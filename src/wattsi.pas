@@ -2181,6 +2181,8 @@ Result := False;
       URLEncodedJSONContents: String;
       HighlighterOutput: String;
       ClassValue: String = '';
+      HTTPClient: TFPHTTPClient;
+      Ss: TStringStream;
    begin
       // The following causes the </pre> end tag for any empty pre elements to
       // be dropped. We can end up with empty pre elements because the first
@@ -2208,22 +2210,35 @@ Result := False;
                   Write(F, HighlighterOutputByJSONContents[CurrentHighlightedElementJSON])
                else
                begin
-                  if (AnsiContainsStr(ClassValue, 'idl')) then
-                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/webidl?' + URLEncodedJSONContents)
-                  else
-                  if (AnsiContainsStr(ClassValue, 'css')) then
-                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/css?' + URLEncodedJSONContents)
-                  else
-                  if (AnsiContainsStr(ClassValue, 'js')) then
-                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/js?' + URLEncodedJSONContents)
-                  else
-                  if (AnsiContainsStr(ClassValue, 'abnf')) then
-                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/abnf?' + URLEncodedJSONContents)
-                  else
-                  if (AnsiContainsStr(ClassValue, 'html')) then
-                     HighlighterOutput := TFPCustomHTTPClient.SimpleGet(HighlightServerURL + '/html?' + URLEncodedJSONContents);
-                  HighlighterOutputByJSONContents[CurrentHighlightedElementJSON] := HighlighterOutput;
-                  Write(F, Trim(HighlighterOutput));
+                  try
+                     HTTPClient := TFPHTTPClient.Create(nil);
+                     Ss := TStringStream.Create('');
+                     if (AnsiContainsStr(ClassValue, 'idl')) then
+                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/webidl?' + URLEncodedJSONContents, Ss, [200,400])
+                     else
+                     if (AnsiContainsStr(ClassValue, 'css')) then
+                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/css?' + URLEncodedJSONContents, Ss, [200,400])
+                     else
+                     if (AnsiContainsStr(ClassValue, 'js')) then
+                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/js?' + URLEncodedJSONContents, Ss, [200,400])
+                     else
+                     if (AnsiContainsStr(ClassValue, 'abnf')) then
+                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/abnf?' + URLEncodedJSONContents, Ss, [200,400])
+                     else
+                     if (AnsiContainsStr(ClassValue, 'html')) then
+                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/html?' + URLEncodedJSONContents, Ss, [200,400]);
+                     HighlighterOutput := Ss.Datastring;
+                     Ss.Free;
+                     if HTTPClient.ResponseStatusCode = 400 then
+                     begin
+                        Write(Trim(HighlighterOutput));
+                        Halt(1);
+                     end;
+                     HighlighterOutputByJSONContents[CurrentHighlightedElementJSON] := HighlighterOutput;
+                     Write(F, Trim(HighlighterOutput));
+                  finally
+                     HTTPClient.Free;
+                  end;
                end;
             except
               on E: EHTTPClient do
