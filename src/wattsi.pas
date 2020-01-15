@@ -1319,7 +1319,8 @@ var
                                     [E(eImg, ['src', 'https://resources.whatwg.org/tracking-vector.svg',
                                               'alt', '(This is a tracking vector.)',
                                               'width', '46',
-                                              'height', '64'])]);
+                                              'height', '64',
+                                              'crossorigin', ''])]);
             (Node.ParentNode as TElement).ReplaceChild(TempElement, Node);
             Node.Free();
             Node := TempElement;
