@@ -173,7 +173,13 @@ begin
    YNULowercase := LowerCase(YesNoUnknown);
    if (YNU = 'Unknown') then
       YNU := '?';
-   BrowserRow := E(eSpan, ['class', BrowserID + ' ' + YNULowercase], Document);
+   if (BrowserID = 'edge_blink') then
+      BrowserRow := E(eSpan, ['class', 'edge ' + YNULowercase], Document)
+   else
+   if (BrowserID = 'edge') then
+      BrowserRow := E(eSpan, ['class', 'edge_legacy ' + YNULowercase], Document)
+   else
+      BrowserRow := E(eSpan, ['class', BrowserID + ' ' + YNULowercase], Document);
    BrowserRow.AppendChild(E(eSpan, [T(MDNBrowsers[BrowserID], Document)]));
    if (Version = '') then
       BrowserRow.AppendChild(E(eSpan, [T(YNU, Document)]))
@@ -2891,7 +2897,8 @@ begin
       // See the list of browser IDs at https://goo.gl/iDacWP.
       MDNBrowsers['chrome'] := 'Chrome';
       MDNBrowsers['chrome_android'] := 'Chrome Android';
-      MDNBrowsers['edge'] := 'Edge';
+      MDNBrowsers['edge_blink'] := 'Edge';
+      MDNBrowsers['edge'] := 'Edge (Legacy)';
       MDNBrowsers['edge_mobile'] := 'Edge Mobile';
       MDNBrowsers['firefox'] := 'Firefox';
       MDNBrowsers['firefox_android'] := 'Firefox Android';
