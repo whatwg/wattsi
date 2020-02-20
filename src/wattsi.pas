@@ -270,14 +270,14 @@ begin
             Document, [T(MDNSubpath, Document)])]));
       MDNDiv.AppendChild(MDNDetails);
       MDNBox.AppendChild(MDNDiv);
-      if (MDNData.Length = 3) then
+      MDNSupport := MDNData['support'];
+      if (MDNSupport = nil) then
       begin
          SupportTable := E(eP, ['class', 'nosupportdata']);
          SupportTable.AppendChild(T('No support data.'));
          MDNDetails.AppendChild(SupportTable);
          continue;
       end;
-      MDNSupport := MDNData['support'];
       SupportTable := E(eP, ['class', 'mdnsupport']);
       MDNDetails.AppendChild(SupportTable);
       for i := 0 to MDNBrowsers.Count - 1 do
