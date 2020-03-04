@@ -26,6 +26,8 @@ For documentation on the "Wattsi language", e.g. things like `data-x` or `w-node
 
 With the [Free Pascal Compiler (fpc)](https://www.freepascal.org/) installed, you should be able to run `./build.sh` to create the `wattsi` executable and supporting shared libraries.
 
+The `wattsi` executable is at `./bin/wattsi`. Tools such as `html-build` use `$PATH` to look for a local `wattsi` executable. In your terminal, run `export PATH=$PATH:$(pwd)/bin`. In the same terminal tab, you can now run tools that use the built `wattsi` executable.
+
 For guidance on installing fpc, see the next section.
 
 We hope to in the future provide precompiled wattsi binaries, built via continuous integration, for Wattsi. If you think you can help with this, please file an issue to get the discussion started! In the meantime, we do provide the [wattsi-server](https://github.com/domenic/wattsi-server) service, which allows you to upload files to a server that will run Wattsi for you.
