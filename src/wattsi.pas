@@ -311,8 +311,9 @@ procedure AddMDNBox(const MDNBox: TElement;
 var
    MDNData, MDNSupport: TJSONObject;
    MDNButton, MDNDiv, MDNDetails, SupportTable: TElement;
-   MDNSlug, MDNSubpath, MDNSummary, BrowserID: UTF8String;
-   i, j: Integer;
+   MDNEngines: TJSONArray;
+   MDNFilename, MDNName, MDNSlug, MDNSubpath, MDNSummary, BrowserID: UTF8String;
+   EngineCount, i, j: Integer;
 const
    kMDNURLBase = 'https://developer.mozilla.org/en-US/docs/Web/';
 begin
@@ -330,15 +331,21 @@ begin
       // MDNJSONData[ID] is an array of objects, where each object has data
       // associated with a particular MDN article which links to the given ID in
       // the HTML spec. We loop through those objects and assign each to an
-      // MDNData, which contains data for a particular MDN article: the article
-      // path, article summary, browser-support data, and article title.
+      // MDNData, which contains data for a particular spec feature: the set of
+      // engines with support for the feature, the browser-compat-data (BCD)
+      // filename which contains data for the feature, the feature name, the
+      // slug for the associated MDN article, the MDN article summary, the BCD
+      // browser-compat support data for the feature, and the MDN article title.
       //
       // Example showing the structure of the JSON data:
       //
       // "sharedworker": [                                <= HTML spec ID
       //  {
+      //    "engines": [ "blink", "gecko" ],              <= supporting engines
+      //    "filename": "api/SharedWorker.json",          <= BCD filename
+      //    "name": "SharedWorker",                       <= BCD feature name
       //    "slug":    "API/SharedWorker",                <= MDN article slug
-      //    "summary": "The SharedWorker interface ..."   <= MDN article summary
+      //    "summary": "The SharedWorker interface ...",  <= MDN article summary
       //    "support": {"chrome":{"version_added":"4"},.. <= MDN support data
       //    },
       //    "title":   "SharedWorker"                     <= MDN article title
@@ -356,6 +363,24 @@ begin
       MDNSummary := MDNData['summary'];
       MDNSubpath := Copy(MDNSlug, Pos('/', MDNSlug) + 1);
       MDNDiv := E(eDiv);
+      if (MDNData['engines'] is TJSONArray) then
+      begin
+          EngineCount := MDNData['engines'].Length;
+      end;
+      if (EngineCount = 0) then
+         MDNDiv.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
+               'title', 'This feature is in no current engines.'],
+               Document, [T(#$26A0, Document)]))
+      else
+      if (EngineCount = 1) then
+         MDNDiv.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
+               'title', 'This feature is in only one current engine.'],
+               Document, [T(#$26A0, Document)]))
+      else
+      if (EngineCount >= 3) then
+         MDNDiv.AppendChild(E(eB, ['class', 'all-engines-flag',
+               'title', 'This feature is in all current engines.'],
+               Document, [T(#$2714, Document)]));
       MDNDiv.AppendChild(E(eB, [T('MDN')]));
       MDNDiv.AppendChild(T(' '));
       MDNDetails := E(eDetails);
@@ -383,6 +408,20 @@ begin
          else
             ProcessBrowserData(BrowserID, MDNSupport[BrowserID],
                                SupportTable, Document);
+      end;
+      if (MDNData['engines'] is TJSONArray) then
+      begin
+        if (EngineCount = 0) then
+           MDNDetails.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
+              Document, [T('In no current engines.', Document)]))
+        else
+        if (EngineCount = 1) then
+           MDNDetails.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
+              Document, [T('In only one current engine.', Document)]))
+        else
+        if (EngineCount >= 3) then
+           MDNDetails.AppendChild(E(eP, ['class', 'all-engines-text'],
+              Document, [T('In all current engines.', Document)]));
       end;
    end;
 end;
