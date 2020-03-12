@@ -189,31 +189,90 @@ begin
 end;
 
 procedure ProcessBrowserData(const BrowserID: UTF8String;
-                             const VersionData: TJSONObject;
+                             const VersionData: TJSON;
                              const SupportTable: TElement;
                              const Document: TDocument);
 var
-   VersionAdded: TJSON;
+   VersionDetails: TJSON;
 begin
-   if (Assigned(VersionData['version_removed'])) then
-      AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document)
+   // MDN support data for a given browser can be an array of objects.
+   if (VersionData is TJSONArray) then
+   begin
+      for VersionDetails in VersionData do
+      begin
+         if (Assigned(VersionDetails['version_removed'])) then
+            continue;
+         if (Assigned(VersionDetails['version_added'])) then
+         begin
+            if (Assigned(VersionDetails['prefix']) or
+                Assigned(VersionDetails['alternative_name']) or
+                Assigned(VersionDetails['partial_implementation'])) then
+               continue;
+            if ((VersionDetails['version_added'] is TJSONBoolean) and
+                (VersionDetails['version_added'] = True)) then
+            begin
+               AddMDNBrowserRow(SupportTable, BrowserID, 'Yes', '', Document);
+               exit;
+            end;
+            if ((VersionDetails['version_added'] is TJSONBoolean) and
+                (VersionDetails['version_added'] = False)) then
+            begin
+               AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document);
+               exit;
+            end;
+            if (VersionDetails['version_added'] = nil) then
+            begin
+               AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '',
+                                Document);
+               exit;
+            end;
+            AddMDNBrowserRow(SupportTable, BrowserID, 'Yes',
+                             UTF8String(VersionDetails['version_added']) + '+',
+                             Document);
+            exit;
+         end;
+      end;
+      AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document);
+   end
    else
    begin
-      VersionAdded := VersionData['version_added'];
-      if (not(Assigned(VersionAdded))) then
-         AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '', Document)
+      if (Assigned(VersionData['version_removed'])) then
+         AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document)
       else
-      if (VersionAdded is TJSONBoolean) then
       begin
-         if TJSONBoolean(VersionAdded) then
-            AddMDNBrowserRow(SupportTable, BrowserID, 'Yes', '', Document)
-         else
-            AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document);
-      end
-      else
-      if (VersionAdded is TJSONString) then
-         AddMDNBrowserRow(SupportTable, BrowserID, 'Yes',
-                          UTF8String(VersionAdded) + '+', Document)
+         if (Assigned(VersionData['version_added'])) then
+         begin
+            if (Assigned(VersionData['prefix']) or
+                Assigned(VersionData['alternative_name']) or
+                Assigned(VersionData['partial_implementation'])) then
+            begin;
+               AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document);
+               exit;
+            end;
+            if ((VersionData['version_added'] is TJSONBoolean) and
+                (VersionData['version_added'] = True)) then
+            begin
+               AddMDNBrowserRow(SupportTable, BrowserID, 'Yes', '', Document);
+               exit;
+            end;
+            if ((VersionData['version_added'] is TJSONBoolean) and
+                (VersionData['version_added'] = False)) then
+            begin
+               AddMDNBrowserRow(SupportTable, BrowserID, 'No', '', Document);
+               exit;
+            end;
+            if (VersionData['version_added'] = nil) then
+            begin
+               AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '',
+                                Document);
+               exit;
+            end;
+            AddMDNBrowserRow(SupportTable, BrowserID, 'Yes',
+                             UTF8String(VersionData['version_added']) +
+                             '+', Document);
+            exit;
+         end;
+      end;
    end;
 end;
 
@@ -291,12 +350,6 @@ begin
          BrowserID := MDNBrowsers.Keys[i];
          if (not(Assigned(MDNSupport[BrowserID]))) then
             AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '', Document)
-         else
-         if (MDNSupport[BrowserID] is TJSONArray) then
-            // MDN support data for a given browser can be an array of objects.
-            for j := 0 to MDNSupport[BrowserID].Length - 1 do
-               ProcessBrowserData(BrowserID, MDNSupport[BrowserID][j],
-                                  SupportTable, Document)
          else
             ProcessBrowserData(BrowserID, MDNSupport[BrowserID],
                                SupportTable, Document);
