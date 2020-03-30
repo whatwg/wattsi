@@ -243,12 +243,6 @@ begin
                                 Document);
                exit;
             end;
-            if (VersionDetails['version_added'] = nil) then
-            begin
-               AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '',
-                                NeedsFlag, Document);
-               exit;
-            end;
             AddMDNBrowserRow(SupportTable, BrowserID, 'Yes',
                              UTF8String(VersionDetails['version_added']) + '+',
                              NeedsFlag, Document);
@@ -290,17 +284,13 @@ begin
                                 Document);
                exit;
             end;
-            if (VersionData['version_added'] = nil) then
-            begin
-               AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '',
-                                NeedsFlag, Document);
-               exit;
-            end;
             AddMDNBrowserRow(SupportTable, BrowserID, 'Yes',
                              UTF8String(VersionData['version_added']) +
                              '+', NeedsFlag, Document);
             exit;
          end;
+         AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '',
+                          NeedsFlag, Document);
       end;
    end;
 end;
