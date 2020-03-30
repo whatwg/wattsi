@@ -297,24 +297,17 @@ end;
 
 procedure AddMDNBox(const MDNBox: TElement;
                     const ID: UTF8String;
-                    const Document: TDocument);
+                    const Document: TDocument;
+                          IsFirst: Boolean);
 var
    MDNData, MDNSupport: TJSONObject;
-   MDNButton, MDNDiv, MDNDetails, SupportTable: TElement;
+   MDNButton, MDNFeature, SupportTable: TElement;
    MDNEngines: TJSONArray;
    MDNFilename, MDNName, MDNSlug, MDNSubpath, MDNSummary, BrowserID: UTF8String;
    EngineCount, i, j: Integer;
 const
    kMDNURLBase = 'https://developer.mozilla.org/en-US/docs/Web/';
 begin
-   // Add an ellipses button unless one has already been added.
-   if (not((MDNBox.FirstChild is TElement)
-         and TElement(MDNBox.FirstChild).IsIdentity(nsHTML, eInput))) then
-   begin
-      MDNButton := E(eInput, ['onclick', 'toggleStatus(this)',
-                     'value', '⋰', 'type', 'button']);
-      MDNBox.AppendChild(MDNButton);
-   end;
    // Get the MDN details for this annotation.
    for MDNData in TJSONArray(MDNJSONData[ID]) do
    begin
@@ -352,43 +345,58 @@ begin
       MDNSlug := MDNData['slug'];
       MDNSummary := MDNData['summary'];
       MDNSubpath := Copy(MDNSlug, Pos('/', MDNSlug) + 1);
-      MDNDiv := E(eDiv);
       if (MDNData['engines'] is TJSONArray) then
+         EngineCount := MDNData['engines'].Length
+      else
+         EngineCount := -1;
+      if (IsFirst) then
       begin
-          EngineCount := MDNData['engines'].Length;
+         MDNButton := E(eButton, ['class', 'mdn-anno-btn',
+            'onclick', 'toggleStatus(this)']);
+         if (EngineCount = 0) then
+            MDNButton.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
+                  'title', 'This feature is in no current engines.'],
+                  Document, [T(#$26A0, Document)]))
+         else
+         if (EngineCount = 1) then
+            MDNButton.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
+                  'title', 'This feature is in only one current engine.'],
+                  Document, [T(#$26A0, Document)]))
+         else
+         if (EngineCount >= 3) then
+            MDNButton.AppendChild(E(eB, ['class', 'all-engines-flag',
+                  'title', 'This feature is in all current engines.'],
+                  Document, [T(#$2714, Document)]));
+         MDNButton.AppendChild(E(eSpan, [T('MDN')]));
+         MDNBox.AppendChild(MDNButton);
       end;
-      if (EngineCount = 0) then
-         MDNDiv.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
-               'title', 'This feature is in no current engines.'],
-               Document, [T(#$26A0, Document)]))
-      else
-      if (EngineCount = 1) then
-         MDNDiv.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
-               'title', 'This feature is in only one current engine.'],
-               Document, [T(#$26A0, Document)]))
-      else
-      if (EngineCount >= 3) then
-         MDNDiv.AppendChild(E(eB, ['class', 'all-engines-flag',
-               'title', 'This feature is in all current engines.'],
-               Document, [T(#$2714, Document)]));
-      MDNDiv.AppendChild(E(eB, [T('MDN')]));
-      MDNDiv.AppendChild(T(' '));
-      MDNDetails := E(eDetails);
-      MDNDetails.AppendChild(E(eSummary, [
+      IsFirst := False;
+      MDNFeature := E(eDiv, ['class', 'feature']);
+      MDNFeature.AppendChild(E(eP, [
          E(eA, ['href', kMDNURLBase + MDNSlug, 'title', MDNSummary],
             Document, [T(MDNSubpath, Document)])]));
-      MDNDiv.AppendChild(MDNDetails);
-      MDNBox.AppendChild(MDNDiv);
+      MDNBox.AppendChild(MDNFeature);
+      if (EngineCount = 0) then
+         MDNFeature.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
+            Document, [T('In no current engines.', Document)]))
+      else
+      if (EngineCount = 1) then
+         MDNFeature.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
+            Document, [T('In only one current engine.', Document)]))
+      else
+      if (EngineCount >= 3) then
+         MDNFeature.AppendChild(E(eP, ['class', 'all-engines-text'],
+            Document, [T('In all current engines.', Document)]));
       MDNSupport := MDNData['support'];
       if (MDNSupport = nil) then
       begin
          SupportTable := E(eP, ['class', 'nosupportdata']);
          SupportTable.AppendChild(T('No support data.'));
-         MDNDetails.AppendChild(SupportTable);
+         MDNFeature.AppendChild(SupportTable);
          continue;
       end;
-      SupportTable := E(eP, ['class', 'mdnsupport']);
-      MDNDetails.AppendChild(SupportTable);
+      SupportTable := E(eP, ['class', 'support']);
+      MDNFeature.AppendChild(SupportTable);
       for i := 0 to MDNBrowsers.Count - 1 do
       begin
          BrowserID := MDNBrowsers.Keys[i];
@@ -398,20 +406,6 @@ begin
          else
             ProcessBrowserData(BrowserID, MDNSupport[BrowserID],
                                SupportTable, Document);
-      end;
-      if (MDNData['engines'] is TJSONArray) then
-      begin
-        if (EngineCount = 0) then
-           MDNDetails.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
-              Document, [T('In no current engines.', Document)]))
-        else
-        if (EngineCount = 1) then
-           MDNDetails.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
-              Document, [T('In only one current engine.', Document)]))
-        else
-        if (EngineCount >= 3) then
-           MDNDetails.AppendChild(E(eP, ['class', 'all-engines-text'],
-              Document, [T('In all current engines.', Document)]));
       end;
    end;
 end;
@@ -899,6 +893,7 @@ var
       Candidate: TNode;
       ID, ClassName: UTF8String;
       TargetAncestor, MDNBox: TElement;
+      IsFirst: Boolean;
    begin
       if (not(Element.HasAttribute('id'))) then
          exit;
@@ -915,18 +910,24 @@ var
          // being annotated. When generating multipage output, inserting the
          // annotation after the heading ensures that it ends up in the right
          // file. It can otherwise incorrectly end up in the previous split.
-         ClassName := 'mdn wrapped';
+         ClassName := 'mdn-anno wrapped';
          MDNBox.SetAttribute('class', ClassName);
          if (Element.NextElementSibling().GetAttribute('class').AsString = ClassName) then
+         begin
             // If there's already an MDN box at the point where we want this,
             // then just re-use it (instead of creating another one).
-            MDNBox := TElement(Element.NextElementSibling())
+            MDNBox := TElement(Element.NextElementSibling());
+            IsFirst := False;
+         end
          else
+         begin
             TElement(Element.ParentNode).InsertBefore(MDNBox, Element.NextSibling);
+            IsFirst := True;
+         end
       end
       else
       begin
-         ClassName := 'mdn wrapped before';
+         ClassName := 'mdn-anno wrapped before';
 
          // Find the furthest ancestor that is a direct child of <body>
          Candidate := Element;
@@ -936,13 +937,19 @@ var
          if (TargetAncestor.PreviousElementSibling().GetAttribute('class').AsString = ClassName) then
             // If there's already an MDN box at the point where we want this,
             // then just re-use it (instead of creating another one).
-            MDNBox := TElement(TargetAncestor.PreviousElementSibling())
+         begin
+            MDNBox := TElement(TargetAncestor.PreviousElementSibling());
+            IsFirst := False;
+         end
          else
+         begin
             TElement(TargetAncestor.ParentNode).InsertBefore(MDNBox, TargetAncestor);
+            IsFirst := True;
+         end
       end;
 
       MDNBox.SetAttribute('class', ClassName);
-      AddMDNBox(MDNBox, ID, Document);
+      AddMDNBox(MDNBox, ID, Document, IsFirst);
    end;
 
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
