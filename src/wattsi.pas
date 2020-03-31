@@ -62,6 +62,16 @@ var
    HighlighterOutputByJSONContents: TStringMap;
    MDNJSONData: TJSON;
    MDNBrowsers: TMDNBrowsers;
+   MDNBrowsersProvidingCurrentEngines:
+      array [0..2] of UTF8String = ('firefox', 'safari', 'chrome');
+   MDNBrowsersWithBorrowedEngines:
+      array [0..1] of UTF8String = ('opera', 'edge_blink');
+   MDNBrowsersWithRetiredEngines:
+      array [0..1] of UTF8String = ('edge', 'ie');
+   MDNBrowsersForMobileDevices:
+      array [0..5] of UTF8String = ('firefox_android', 'safari_ios',
+                                    'chrome_android', 'webview_android',
+                                    'samsunginternet_android', 'opera_android');
    CurrentVariant: TAllVariants;
 
 const
@@ -188,10 +198,10 @@ begin
    if (YNU = 'Unknown') then
       YNU := '?';
    if (BrowserID = 'edge_blink') then
-      BrowserRow := E(eSpan, ['class', 'edge ' + YNULowercase], Document)
+      BrowserRow := E(eSpan, ['class', 'edge_blink ' + YNULowercase], Document)
    else
    if (BrowserID = 'edge') then
-      BrowserRow := E(eSpan, ['class', 'edge_legacy ' + YNULowercase], Document)
+      BrowserRow := E(eSpan, ['class', 'edge ' + YNULowercase], Document)
    else
       BrowserRow := E(eSpan, ['class', BrowserID + ' ' + YNULowercase], Document);
    BrowserRow.AppendChild(E(eSpan, [T(MDNBrowsers[BrowserID], Document)]));
@@ -212,6 +222,11 @@ var
    NeedsFlag: Boolean;
    VersionDetails: TJSON;
 begin
+   if (not(Assigned(VersionData))) then
+   begin
+      AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '', False, Document);
+      exit;
+   end;
    NeedsFlag := False;
    // MDN support data for a given browser can be an array of objects.
    if (VersionData is TJSONArray) then
@@ -363,7 +378,7 @@ begin
                   'title', 'This feature is in only one current engine.'],
                   Document, [T(#$26A0, Document)]))
          else
-         if (EngineCount >= 3) then
+         if (EngineCount >= Length(MDNBrowsersProvidingCurrentEngines)) then
             MDNButton.AppendChild(E(eB, ['class', 'all-engines-flag',
                   'title', 'This feature is in all current engines.'],
                   Document, [T(#$2714, Document)]));
@@ -384,7 +399,7 @@ begin
          MDNFeature.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
             Document, [T('In only one current engine.', Document)]))
       else
-      if (EngineCount >= 3) then
+      if (EngineCount >= Length(MDNBrowsersProvidingCurrentEngines)) then
          MDNFeature.AppendChild(E(eP, ['class', 'all-engines-text'],
             Document, [T('In all current engines.', Document)]));
       MDNSupport := MDNData['support'];
@@ -395,18 +410,23 @@ begin
          MDNFeature.AppendChild(SupportTable);
          continue;
       end;
-      SupportTable := E(eP, ['class', 'support']);
+      SupportTable := E(eDiv, ['class', 'support']);
       MDNFeature.AppendChild(SupportTable);
-      for i := 0 to MDNBrowsers.Count - 1 do
-      begin
-         BrowserID := MDNBrowsers.Keys[i];
-         if (not(Assigned(MDNSupport[BrowserID]))) then
-            AddMDNBrowserRow(SupportTable, BrowserID, 'Unknown', '', False,
-                             Document)
-         else
-            ProcessBrowserData(BrowserID, MDNSupport[BrowserID],
-                               SupportTable, Document);
-      end;
+      for BrowserID in MDNBrowsersProvidingCurrentEngines do
+         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
+                            Document);
+      SupportTable.AppendChild(E(eHR));
+      for BrowserID in MDNBrowsersWithBorrowedEngines do
+         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
+                            Document);
+      SupportTable.AppendChild(E(eHR));
+      for BrowserID in MDNBrowsersWithRetiredEngines do
+         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
+                            Document);
+      SupportTable.AppendChild(E(eHR));
+      for BrowserID in MDNBrowsersForMobileDevices do
+         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
+                            Document);
    end;
 end;
 
@@ -3030,7 +3050,6 @@ begin
       MDNBrowsers['chrome_android'] := 'Chrome Android';
       MDNBrowsers['edge_blink'] := 'Edge';
       MDNBrowsers['edge'] := 'Edge (Legacy)';
-      MDNBrowsers['edge_mobile'] := 'Edge Mobile';
       MDNBrowsers['firefox'] := 'Firefox';
       MDNBrowsers['firefox_android'] := 'Firefox Android';
       MDNBrowsers['ie'] := 'Internet Explorer';
