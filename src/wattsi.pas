@@ -426,6 +426,74 @@ begin
    end;
 end;
 
+function IsMDNBox(const Element: TElement): Boolean;
+var
+   ClassName: UTF8String;
+begin
+   ClassName := Element.GetAttribute('class').AsString;
+   Result := (ClassName = 'mdn wrapped') or (ClassName = 'mdn wrapped before');
+end;
+
+// This procedure is called from two different locations, one with each of these passes.
+// This is necessary because the first time, the tree is only in a state where we can insert
+// before the element, whereas the second time, we can only insert after.
+// For <p>s and headings, we want to insert after that ancestor:
+// - For <p>s, we want to avoid overlapping the <p> contents.
+// - For headings, we need to ensure that on any multipage splits, we end up in the correct file.
+type TMDNAnnotationPass = (vBeforeElement, vAfterElement);
+procedure InsertMDNAnnotationForElement(const Document: TDocument; const Element: TElement; const Pass: TMDNAnnotationPass);
+var
+   Candidate: TNode;
+   ID, ClassName: UTF8String;
+   IsAfterPassOnlyElement: Boolean;
+   InsertBeforeLocation, MDNBox, PotentialExistingBox: TElement;
+begin
+   if (not(Element.HasAttribute('id'))) then
+      exit;
+   ID := Element.GetAttribute('id').AsString;
+   if (not(MDNJSONData[ID] is TJSONArray)) then
+      // No MDN article has a link to this ID.
+      exit;
+
+   // Find the furthest ancestor that is a direct child of <body>.
+   Candidate := Element;
+   while not TElement(Candidate.ParentNode).IsIdentity(nsHTML, eBody) do
+   begin
+      Candidate := Candidate.ParentNode;
+   end;
+   InsertBeforeLocation := TElement(Candidate);
+
+   // Bail out if we're in the wrong pass.
+   IsAfterPassOnlyElement := InsertBeforeLocation.HasProperties(propHeading) or
+                             InsertBeforeLocation.isIdentity(nsHTML, eP);
+   if (IsAfterPassOnlyElement and not(Pass = vAfterElement)) then
+      exit;
+   if (not(IsAfterPassOnlyElement) and (Pass = vAfterElement)) then
+      exit;
+
+   // If we want to insert after, then adjust the InsertBeforeLocation to be the first non-MDN-box
+   // element after the ancestor, and adjust the ClassName appropriately.
+   ClassName := 'mdn wrapped before';
+   if (IsAfterPassOnlyElement) then
+   begin
+      InsertBeforeLocation := InsertBeforeLocation.NextElementSibling();
+      while (IsMDNBox(InsertBeforeLocation)) do
+         InsertBeforeLocation := InsertBeforeLocation.NextElementSibling();
+
+      ClassName := 'mdn wrapped';
+   end;
+
+   MDNBox := E(eAside, ['class', ClassName]);
+
+   PotentialExistingBox := InsertBeforeLocation.PreviousElementSibling();
+   if (IsMDNBox(PotentialExistingBox)) then
+      MDNBox := PotentialExistingBox
+   else
+      TElement(InsertBeforeLocation.ParentNode).InsertBefore(MDNBox, InsertBeforeLocation);
+
+   AddMDNBox(MDNBox, ID, Document);
+end;
+
 procedure ProcessDocument(const Document: TDocument; const Variant: TVariants; out BigTOC: TElement; const SourceGitSHA: AnsiString);
 type
    PElementListNode = ^TElementListNode;
@@ -1423,6 +1491,8 @@ var
 
    procedure ProcessNodeExit(const Node: TElement);
    begin
+      if (Variant <> vReview) then
+         InsertMDNAnnotationForElement(Document, Node, vBeforeElement);
       if (Node = InHeading) then
          InHeading := nil
       else
@@ -2183,61 +2253,6 @@ Result := False;
       Write(F, WPTOutput.Text);
    end;
 
-   procedure InsertMDNAnnotationForElement(const Element: TElement);
-   var
-      ID, ClassName: UTF8String;
-      MDNBox, PotentialExistingBox: TElement;
-      InsertBeforeLocation: TNode;
-   begin
-      if ((CurrentVariant = vHTML) and InSplit) then
-         // MDN annotations have already been inserted in this case.
-         exit;
-      if (not(Element.HasAttribute('id'))) then
-         exit;
-      ID := Element.GetAttribute('id').AsString;
-      if (not(MDNJSONData[ID] is TJSONArray)) then
-         // No MDN article has a link to this ID.
-         exit;
-
-      MDNBox := E(eAside);
-
-      // Find the furthest ancestor that is a direct child of <body>
-      InsertBeforeLocation := Element;
-      while not TElement(InsertBeforeLocation.ParentNode).IsIdentity(nsHTML, eBody) do
-      begin
-         InsertBeforeLocation := InsertBeforeLocation.ParentNode;
-      end;
-
-      // For <p>s and headings, we want to insert after that ancestor:
-      // - For <p>s, we want to avoid overlapping the <p> contents.
-      // - For headings, we need to ensure that on any multipage splits, we end up in the correct file.
-      ClassName := 'mdn before wrapped';
-      PotentialExistingBox := InsertBeforeLocation.PreviousElementSibling();
-      if (TElement(InsertBeforeLocation).HasProperties(propHeading) or
-          TElement(InsertBeforeLocation).isIdentity(nsHTML, eP)) then
-      begin
-         ClassName := 'mdn wrapped';
-         PotentialExistingBox := InsertBeforeLocation.NextElementSibling();
-         InsertBeforeLocation := InsertBeforeLocation.NextSibling;
-      end;
-
-      // If there's already an MDN box at the point where we want this,
-      // then just re-use it (instead of creating another one).
-      if (Assigned(PotentialExistingBox) and
-          ((PotentialExistingBox.GetAttribute('class').AsString = 'mdn wrapped') or
-           (PotentialExistingBox.GetAttribute('class').AsString = 'mdn before wrapped'))) then
-      begin
-         MDNBox := PotentialExistingBox
-      end
-      else
-      begin
-         MDNBox.SetAttribute('class', ClassName);
-         TElement(InsertBeforeLocation.ParentNode).InsertBefore(MDNBox, InsertBeforeLocation);
-      end;
-
-      AddMDNBox(MDNBox, ID, Document);
-   end;
-
    procedure WalkIn(const Element: TElement);
    var
       IsExcluder, Skip, NotFirstAttribute: Boolean;
@@ -2391,8 +2406,8 @@ Result := False;
             CurrentlyInHighlightedElement := False;
          end;
       end;
-      if (CurrentVariant <> vReview) then
-         InsertMDNAnnotationForElement(Element);
+      if ((CurrentVariant <> vReview) and not((CurrentVariant = vHTML) and InSplit)) then
+         InsertMDNAnnotationForElement(Document, Element, vAfterElement);
       if (Element.ParentNode is TElement) then
          CurrentElement := TElement(Element.ParentNode)
       else
