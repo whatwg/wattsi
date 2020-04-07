@@ -174,7 +174,9 @@ procedure AddMDNBrowserRow(const SupportTable: TElement;
                            const BrowserID: UTF8String;
                            const YesNoUnknown: UTF8String;
                            const Version: UTF8String;
+                           const IsPartial: Boolean;
                            const NeedsFlag: Boolean;
+                           const NeedsPrefixOrAltName: Boolean;
                            const Document: TDocument);
 type
    AttributesArray = array of UTF8String;
@@ -186,14 +188,18 @@ var
 begin
    BrowserClass := BrowserID + ' ' + YesNoUnknown;
    FlagSymbol := '';
-   if (NeedsFlag) then
-   begin
+   BrowserVersionAttributes := Default(AttributesArray);
+   if (IsPartial or NeedsFlag or NeedsPrefixOrAltName) then
       FlagSymbol := UTF8String(#$F0#$9F#$94#$B0) + ' ';
+   if (NeedsPrefixOrAltName) then
+      BrowserVersionAttributes := AttributesArray
+        .Create('title', 'Requires a prefix or alternative name.');
+   if (NeedsFlag) then
       BrowserVersionAttributes := AttributesArray
         .Create('title', 'Requires setting a user preference or runtime flag.');
-   end
-   else
-      BrowserVersionAttributes := Default(AttributesArray);
+   if (IsPartial) then
+      BrowserVersionAttributes := AttributesArray
+        .Create('title', 'Partial implementation.');
    if (BrowserID = 'edge_blink') then
       BrowserClass := 'edge_blink ' + YesNoUnknown
    else
@@ -249,15 +255,18 @@ procedure ProcessBrowserData(const BrowserID: UTF8String;
                              const SupportTable: TElement;
                              const Document: TDocument);
 var
-   NeedsFlag: Boolean;
+   NeedsFlag, NeedsPrefixOrAltName, IsPartial: Boolean;
    VersionDetails: TJSON;
    YesNoUnknown, Version, VersionAdded, VersionRemoved: UTF8String;
 begin
    NeedsFlag := False;
+   NeedsPrefixOrAltName := False;
+   IsPartial := False;
    YesNoUnknown := 'unknown';
    Version := '?';
    VersionAdded := '';
    VersionRemoved := '';
+
    // MDN support data for a given browser can be an array of objects.
    if (VersionData is TJSONArray) then
    begin
@@ -273,17 +282,21 @@ begin
          end;
          if (VersionAdded <> '') then
          begin
+            YesNoUnknown := IfThen((VersionAdded = 'False'), 'no', 'yes');
+            if (Assigned(VersionDetails['partial_implementation'])) then
+               IsPartial := True;
             if (Assigned(VersionDetails['flags'])) then
                NeedsFlag := True;
             if (Assigned(VersionDetails['prefix']) or
-                Assigned(VersionDetails['alternative_name']) or
-                Assigned(VersionDetails['partial_implementation'])) then
-            begin
-               YesNoUnknown := 'no';
-               continue;
-            end;
-            YesNoUnknown := IfThen((VersionAdded = 'False'), 'no', 'yes');
-            if (NeedsFlag = False) then
+                Assigned(VersionDetails['alternative_name'])) then
+               NeedsPrefixOrAltName := True;
+            if ((NeedsFlag = False) and
+                (IsPartial = False) and
+                (NeedsPrefixOrAltName = False)) then
+               break;
+            if (IsPartial = True) then
+               break;
+            if (NeedsFlag = True) then
                break;
          end;
       end;
@@ -299,21 +312,21 @@ begin
       begin
          if (VersionAdded <> '') then
          begin
+            YesNoUnknown := IfThen((VersionAdded = 'False'), 'no', 'yes');
+            if (Assigned(VersionData['partial_implementation'])) then
+               IsPartial := True;
             if (Assigned(VersionData['flags'])) then
                NeedsFlag := True;
             if (Assigned(VersionData['prefix']) or
-                Assigned(VersionData['alternative_name']) or
-                Assigned(VersionData['partial_implementation'])) then
-               YesNoUnknown := 'no'
-            else
-               YesNoUnknown := IfThen((VersionAdded = 'False'), 'no', 'yes');
+                Assigned(VersionData['alternative_name'])) then
+               NeedsPrefixOrAltName := True;
          end;
       end;
    end;
    Version :=
       GetVersionOrRange(BrowserID, VersionAdded, VersionRemoved, YesNoUnknown);
-   AddMDNBrowserRow(SupportTable, BrowserID, YesNoUnknown, Version, NeedsFlag,
-                    Document);
+   AddMDNBrowserRow(SupportTable, BrowserID, YesNoUnknown, Version, IsPartial,
+                    NeedsFlag, NeedsPrefixOrAltName, Document);
 end;
 
 procedure AddMDNBox(const MDNBox: TElement;
@@ -325,9 +338,25 @@ var
    MDNButton, MDNFeature, SupportTable: TElement;
    MDNEngines: TJSONArray;
    MDNFilename, MDNName, MDNSlug, MDNSubpath, MDNSummary, BrowserID: UTF8String;
+   FlagClassName, FlagSymbol, FlagTitle: UTF8String;
+   EnginesClassName, EnginesText: UTF8String;
    EngineCount, i, j: Integer;
 const
    kMDNURLBase = 'https://developer.mozilla.org/en-US/docs/Web/';
+   kFlagClassLessThanTwo = 'less-than-two-engines-flag';
+   kFlagClassAll = 'all-engines-flag';
+   kEnginesClassLessThanTwo = 'less-than-two-engines-text';
+   kEnginesClassAll = 'all-engines-text';
+   kInNone = 'No support in current engines.';
+   kInOne = 'Support in one engine only.';
+   kInAll = 'Support in all current engines.';
+   kAltNameInOne = 'Support in one engine under other name.';
+   kAltNameInSome = 'Support in some engines under other name.';
+   kPrefixInOne = 'Prefixed support in one engine.';
+   kPrefixInSome = 'Prefixed support in some engines.';
+   kPartialInOne = 'Partial support in one engine.';
+   kPartialInSome = 'Partial support in some engines.';
+
 begin
    // Get the MDN details for this annotation.
    for MDNData in TJSONArray(MDNJSONData[ID]) do
@@ -346,12 +375,14 @@ begin
       // "sharedworker": [                                <= HTML spec ID
       //  {
       //    "engines": [ "blink", "gecko" ],              <= supporting engines
+      //    "partial": [ "safari" ],                      <= partial support
+      //    "prefixed": [ "gecko", "safari" ],            <= prefixed support
+      //    "altname": [ "gecko" ],                       <= alternative name
       //    "filename": "api/SharedWorker.json",          <= BCD filename
       //    "name": "SharedWorker",                       <= BCD feature name
       //    "slug":    "API/SharedWorker",                <= MDN article slug
       //    "summary": "The SharedWorker interface ...",  <= MDN article summary
       //    "support": {"chrome":{"version_added":"4"},.. <= MDN support data
-      //    },
       //    "title":   "SharedWorker"                     <= MDN article title
       //  },
       //  {
@@ -375,19 +406,47 @@ begin
          MDNButton := E(eButton, ['class', 'mdn-anno-btn',
             'onclick', 'toggleStatus(this)']);
          if (EngineCount = 0) then
-            MDNButton.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
-                  'title', 'This feature is in no current engines.'],
-                  Document, [T(#$26A0, Document)]))
+         begin
+            FlagClassName := kFlagClassLessThanTwo;
+            FlagSymbol := #$26A0;
+            FlagTitle := kInNone;
+            if (Assigned(MDNData['altname'])) then
+            begin
+               FlagTitle := kAltNameInOne;
+               if (MDNData['altname'].Length > 1) then
+                  FlagTitle := kAltNameInSome;
+            end
+            else
+            if (Assigned(MDNData['prefixed'])) then
+            begin
+               FlagTitle := kPrefixInOne;
+               if (MDNData['Prefixed'].Length > 1) then
+                  FlagTitle := kPrefixInSome;
+            end
+            else
+            if (Assigned(MDNData['partial'])) then
+            begin
+               FlagTitle := kPartialInOne;
+               if (MDNData['partial'].Length > 1) then
+                  FlagTitle := kPartialInSome;
+            end
+         end
          else
          if (EngineCount = 1) then
-            MDNButton.AppendChild(E(eB, ['class', 'less-than-two-engines-flag',
-                  'title', 'This feature is in only one current engine.'],
-                  Document, [T(#$26A0, Document)]))
+         begin
+            FlagClassName := kFlagClassLessThanTwo;
+            FlagSymbol := #$26A0;
+            FlagTitle := kInOne;
+         end
          else
          if (EngineCount >= Length(MDNBrowsersProvidingCurrentEngines)) then
-            MDNButton.AppendChild(E(eB, ['class', 'all-engines-flag',
-                  'title', 'This feature is in all current engines.'],
-                  Document, [T(#$2714, Document)]));
+         begin
+            FlagClassName := kFlagClassAll;
+            FlagSymbol := #$2714;
+            FlagTitle := kInAll;
+         end;
+         MDNButton.AppendChild(E(eB, ['class', FlagClassName,
+               'title', FlagTitle], Document, [T(FlagSymbol, Document)]));
          MDNButton.AppendChild(E(eSpan, [T('MDN')]));
          MDNBox.AppendChild(MDNButton);
       end;
@@ -398,16 +457,44 @@ begin
             Document, [T(MDNSubpath, Document)])]));
       MDNBox.AppendChild(MDNFeature);
       if (EngineCount = 0) then
-         MDNFeature.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
-            Document, [T('In no current engines.', Document)]))
+      begin
+         EnginesClassName := kEnginesClassLessThanTwo;
+         EnginesText := kInNone;
+         if (Assigned(MDNData['altname'])) then
+         begin
+            EnginesText := kAltNameInOne;
+            if (MDNData['altname'].Length > 1) then
+               EnginesText := kAltNameInSome;
+         end
+         else
+         if (Assigned(MDNData['prefixed'])) then
+         begin
+            EnginesText := kPrefixInOne;
+            if (MDNData['prefixed'].Length > 1) then
+               EnginesText := kPrefixInSome;
+         end
+         else
+         if (Assigned(MDNData['partial'])) then
+         begin
+            EnginesText := kPartialInOne;
+            if (MDNData['partial'].Length > 1) then
+               EnginesText := kPartialInSome;
+         end
+      end
       else
       if (EngineCount = 1) then
-         MDNFeature.AppendChild(E(eP, ['class', 'less-than-two-engines-text'],
-            Document, [T('In only one current engine.', Document)]))
+      begin
+         EnginesClassName := kEnginesClassLessThanTwo;
+         EnginesText := kInOne;
+      end
       else
       if (EngineCount >= Length(MDNBrowsersProvidingCurrentEngines)) then
-         MDNFeature.AppendChild(E(eP, ['class', 'all-engines-text'],
-            Document, [T('In all current engines.', Document)]));
+      begin
+         EnginesClassName := kEnginesClassAll;
+         EnginesText := kInAll;
+      end;
+      MDNFeature.AppendChild(E(eP, ['class', EnginesClassName],
+         Document, [T(EnginesText, Document)]));
       MDNSupport := MDNData['support'];
       if (MDNSupport = nil) then
       begin
