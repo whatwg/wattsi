@@ -397,6 +397,7 @@ begin
       MDNSlug := MDNData['slug'];
       MDNSummary := MDNData['summary'];
       MDNSubpath := Copy(MDNSlug, Pos('/', MDNSlug) + 1);
+      MDNSupport := MDNData['support'];
       if (MDNData['engines'] is TJSONArray) then
          EngineCount := MDNData['engines'].Length
       else
@@ -445,8 +446,9 @@ begin
             FlagSymbol := #$2714;
             FlagTitle := kInAll;
          end;
-         MDNButton.AppendChild(E(eB, ['class', FlagClassName,
-               'title', FlagTitle], Document, [T(FlagSymbol, Document)]));
+         if ((EngineCount <> 2) and (MDNSupport <> nil)) then
+            MDNButton.AppendChild(E(eB, ['class', FlagClassName,
+                  'title', FlagTitle], Document, [T(FlagSymbol, Document)]));
          MDNButton.AppendChild(E(eSpan, [T('MDN')]));
          MDNBox.AppendChild(MDNButton);
       end;
@@ -493,16 +495,10 @@ begin
          EnginesClassName := kEnginesClassAll;
          EnginesText := kInAll;
       end;
-      MDNFeature.AppendChild(E(eP, ['class', EnginesClassName],
-         Document, [T(EnginesText, Document)]));
-      MDNSupport := MDNData['support'];
-      if (MDNSupport = nil) then
-      begin
-         SupportTable := E(eP, ['class', 'nosupportdata']);
-         SupportTable.AppendChild(T('No support data.'));
-         MDNFeature.AppendChild(SupportTable);
-         continue;
-      end;
+      if (MDNSupport = nil) then continue;
+      if (EngineCount <> 2) then
+         MDNFeature.AppendChild(E(eP, ['class', EnginesClassName],
+            Document, [T(EnginesText, Document)]));
       SupportTable := E(eDiv, ['class', 'support']);
       MDNFeature.AppendChild(SupportTable);
       for BrowserID in MDNBrowsersProvidingCurrentEngines do
