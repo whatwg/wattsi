@@ -1036,6 +1036,34 @@ var
          end
       end
       else
+      if (HasAncestor(Element, nsHTML, eTD) or HasAncestor(Element, nsHTML, eDT)) then
+      begin
+         // For elements we're annotating inside a <td> or <dt>, we append the
+         // annotation directly to the <td> or <dt> as the last child. Otherwise
+         // in cases where we have a long table (e.g., the list of events in the
+         // index) or long <dl> list (e.g., the list of pseudo-classes), all the
+         // annos for everything in that table or list end up being merged into
+         // a single annotation way up at the beginning of the table or list.
+         ClassName := 'mdn-anno wrapped before';
+         Candidate := Element;
+         while not TElement(Candidate).IsIdentity(nsHTML, eTD) and
+               not TElement(Candidate).IsIdentity(nsHTML, eDT) do
+            Candidate := Candidate.ParentNode;
+         TargetAncestor := TElement(Candidate);
+         if (TargetAncestor.LastElementChild().GetAttribute('class').AsString = ClassName) then
+         begin
+            // If there's already an MDN box at the point where we want this,
+            // then just re-use it (instead of creating another one).
+            MDNBox := TargetAncestor.LastElementChild();
+            IsFirst := False;
+         end
+         else
+         begin
+            TargetAncestor.AppendChild(MDNBox);
+            IsFirst := True;
+         end;
+      end
+      else
       begin
          ClassName := 'mdn-anno wrapped before';
 
