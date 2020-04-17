@@ -189,24 +189,25 @@ begin
    BrowserClass := BrowserID + ' ' + YesNoUnknown;
    FlagSymbol := '';
    BrowserVersionAttributes := Default(AttributesArray);
+   BrowserVersionAttributes := AttributesArray.Create('data-x', '');
    if (IsPartial or NeedsFlag or NeedsPrefixOrAltName) then
       FlagSymbol := UTF8String(#$F0#$9F#$94#$B0) + ' ';
    if (NeedsPrefixOrAltName) then
       BrowserVersionAttributes := AttributesArray
-        .Create('title', 'Requires a prefix or alternative name.');
+        .Create('data-x', '', 'title', 'Requires a prefix or alternative name.');
    if (NeedsFlag) then
       BrowserVersionAttributes := AttributesArray
-        .Create('title', 'Requires setting a user preference or runtime flag.');
+        .Create('data-x', '', 'title', 'Requires setting a user preference or runtime flag.');
    if (IsPartial) then
       BrowserVersionAttributes := AttributesArray
-        .Create('title', 'Partial implementation.');
+        .Create('data-x', '', 'title', 'Partial implementation.');
    if (BrowserID = 'edge_blink') then
       BrowserClass := 'edge_blink ' + YesNoUnknown
    else
    if (BrowserID = 'edge') then
       BrowserClass := 'edge ' + YesNoUnknown;
-   BrowserRow := E(eSpan, ['class', BrowserClass], Document);
-   BrowserRow.AppendChild(E(eSpan, [T(MDNBrowsers[BrowserID], Document)]));
+   BrowserRow := E(eSpan, ['data-x', '', 'class', BrowserClass], Document);
+   BrowserRow.AppendChild(E(eSpan, ['data-x', ''], [T(MDNBrowsers[BrowserID], Document)]));
    BrowserRow.AppendChild(E(eSpan, BrowserVersionAttributes,
                              [T(FlagSymbol + Version, Document)]));
    SupportTable.AppendChild(BrowserRow);
@@ -449,7 +450,7 @@ begin
          if ((EngineCount <> 2) and (MDNSupport <> nil)) then
             MDNButton.AppendChild(E(eB, ['class', FlagClassName,
                   'title', FlagTitle], Document, [T(FlagSymbol, Document)]));
-         MDNButton.AppendChild(E(eSpan, [T('MDN')]));
+         MDNButton.AppendChild(E(eSpan, ['data-x', ''], [T('MDN')]));
          MDNBox.AppendChild(MDNButton);
       end;
       IsFirst := False;
