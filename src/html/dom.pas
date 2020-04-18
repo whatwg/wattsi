@@ -71,6 +71,8 @@ type
       function CloneNode(const Deep: Boolean = False): TNode; virtual; abstract;
       function NextElementSibling(): TElement;
       function PreviousElementSibling(): TElement;
+      function FirstElementChild(): TElement;
+      function LastElementChild(): TElement;
       property ParentNode: TNode read FParentNode;
       property PreviousSibling: TNode read FPreviousSibling;
       property NextSibling: TNode read FNextSibling;
@@ -103,6 +105,8 @@ type
       FChildNodes: TDocumentNodeList;
       function GetFirstChild(): TNode; inline;
       function GetLastChild(): TNode; inline;
+      function GetFirstElementChild(): TElement; inline;
+      function GetLastElementChild(): TElement; inline;
     public
       constructor Create();
       constructor Create(const NewDocType: TDocumentType; const NewDocumentElement: TElement; const NewDocumentMode: TDocumentMode = dmNoQuirksMode);
@@ -151,6 +155,8 @@ type
         function GetItem(const Index: Integer): TNode; override;
         function GetFirstChild(): TNode; inline;
         function GetLastChild(): TNode; inline;
+        function GetFirstElementChild(): TElement inline;
+        function GetLastElementChild(): TElement inline;
        public
         constructor Create(const ParentNode: TElement);
         procedure InsertAt(const NewNode: TNode; const Position: Integer);
@@ -179,6 +185,8 @@ type
       function GetChildNodes(): TNodeList; inline;
       function GetFirstChild(): TNode; inline;
       function GetLastChild(): TNode; inline;
+      function GetFirstElementChild(): TElement inline;
+      function GetLastElementChild(): TElement inline;
       procedure EnsureChildNodes();
       procedure EnsureAttributes();
     public
@@ -343,6 +351,28 @@ begin
       exit;
     end;
   end;
+end;
+
+function TNode.FirstElementChild(): TElement;
+begin
+   if (Self is TElement) then
+      Result := TElement(Self).GetFirstElementChild()
+   else
+   if (Self is TDocument) then
+      Result := TDocument(Self).GetFirstElementChild()
+   else
+      Result := nil;
+end;
+
+function TNode.LastElementChild(): TElement;
+begin
+   if (Self is TElement) then
+      Result := TElement(Self).GetLastElementChild()
+   else
+   if (Self is TDocument) then
+      Result := TDocument(Self).GetLastElementChild()
+   else
+      Result := nil;
 end;
 
 function TDocument.TDocumentNodeList.GetLength(): Integer;
@@ -717,6 +747,24 @@ begin
    else
    if (Length(FChildNodes.FCommentsTop) > 0) then
       Result := FChildNodes.FCommentsTop[High(FChildNodes.FCommentsTop)]
+   else
+      Result := nil;
+   Assert(Assigned(Result) = (FChildNodes.Length > 0));
+end;
+
+function TDocument.GetFirstElementChild(): TElement;
+begin
+   if (Assigned(FChildNodes.FDocumentElement)) then
+      Result := FChildNodes.FDocumentElement
+   else
+      Result := nil;
+   Assert(Assigned(Result) = (FChildNodes.Length > 0));
+end;
+
+function TDocument.GetLastElementChild(): TElement;
+begin
+   if (Assigned(FChildNodes.FDocumentElement)) then
+      Result := FChildNodes.FDocumentElement
    else
       Result := nil;
    Assert(Assigned(Result) = (FChildNodes.Length > 0));
@@ -1317,6 +1365,53 @@ begin
    end;
 end;
 
+function TElement.TElementChildrenNodeList.GetFirstElementChild(): TElement;
+var
+  Node: TNode;
+begin
+   Assert((not FMaintainingArray) or (not Assigned(FFirstNode)));
+   if (FMaintainingArray and (FCount > 0)) then
+   begin
+      Node := FNodes[FStart];
+      if (Node is TElement) then
+         Result := TElement(Node)
+      else
+         Result := Node.NextElementSibling();
+   end
+   else
+   begin
+      Node := FFirstNode;
+      if (Node is TElement) then
+         Result := TElement(Node)
+      else
+         Result := Node.NextElementSibling();
+      Assert(Assigned(Result) = (FCount > 0));
+   end;
+end;
+
+function TElement.TElementChildrenNodeList.GetLastElementChild(): TElement;
+var
+  Node: TNode;
+begin
+   Assert((not FMaintainingArray) or (not Assigned(FLastNode)));
+   if (FMaintainingArray and (FCount > 0)) then
+   begin
+      Node := FNodes[FStart+FCount-1];
+      if (Node is TElement) then
+         Result := TElement(Node)
+      else
+         Result := Node.PreviousElementSibling();
+   end
+   else
+   begin
+      Node := FLastNode;
+      if (Node is TElement) then
+         Result := TElement(Node)
+      else
+         Result := Node.PreviousElementSibling();
+      Assert(Assigned(Result) = (FCount > 0));
+   end;
+end;
 
 constructor TElement.Create(const NewNamespaceURL: TCanonicalString; const NewLocalName: TCanonicalString; const NewAttributes: TAttributeHashTable; const NewChildren: array of TNode; const NewProperties: TElementProperties);
 var
@@ -1510,6 +1605,26 @@ begin
    if (Assigned(FChildNodes)) then
    begin
       Result := FChildNodes.LastChild;
+   end
+   else
+      Result := nil;
+end;
+
+function TElement.GetFirstElementChild(): TElement;
+begin
+   if (Assigned(FChildNodes)) then
+   begin
+      Result := FChildNodes.GetFirstElementChild();
+   end
+   else
+      Result := nil;
+end;
+
+function TElement.GetLastElementChild(): TElement;
+begin
+   if (Assigned(FChildNodes)) then
+   begin
+      Result := FChildNodes.GetLastElementChild();
    end
    else
       Result := nil;
