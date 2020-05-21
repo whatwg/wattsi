@@ -1,0 +1,32 @@
+language: bash
+services:
+  - docker
+
+git:
+  depth: false
+
+env:
+  global:
+    - IMAGE_NAME=whatwg/wattsi
+    - DOCKER_USERNAME=domenicdenicola
+    - secure: "gXc7fg5eVsFk//Lxt8clbPwrYKecbUZ21wx1cGCBBPuJ4GYbbIGMiOd3RimYP0iOa2UaKgXtiyi9midB5fs2Xiw2O3C5l1VLvRn7JGHQD3KaFi6bfofmmygdg7VT9KFgvxLsPCde3ZtYLvc8s/VSYSrwIEOe2mhC7iUg4tkC7E2aFK0y3ElqQk7fQTcMXX4KE+pGS5EJ75qgHA5Js/W0x2bz/Cl3onIINC5B/8RWCKIEmfRu/4hKJABv98km+zB5WCmuFZSGzbP1F5gCU9qg9EIgP0na8B7mjRiZ3WkpfAFSrPtVTkaDVnKTKeriiWIsLt6lOClZKFr5iocg8rFuKj6RrST0MFSmGJvJByWVoiMwHVmEZv3vX39IIUEQDiH7GEv8Q5R5P6hHbRnSCN5nGNoylcFAAi4dELpgEqRrJEoLvURxfSthZJUNRKoLm0zhECxuUggJEqseG1GCzYlob3efaGwDmJONeazjJcX3IDPs/oX8bf4HqkyoZcAvOHKzPof6EzNNGdlSXL0TXsET2SRVB7y8hlypI6xJ5l1HGfALZDb6bYwFvjmzSoXcHcY1jU4w8HUUm7VBbGBy1Mu0WHeYE4dsjOuOp8lSf2eFd5L1Y2FaJfMt3TWe7uNEIPLzglwX3T1QuaaVpSKAB0BQ/VY8/OjLe1wXb6NlsF+HBnA="
+
+before_script:
+  - VERSION="$(git rev-list --count HEAD)"
+  - echo "$VERSION" > src/version.inc
+  - docker pull "$IMAGE_NAME" || true
+script:
+  - docker build --pull --cache-from "$IMAGE_NAME" --tag "$IMAGE_NAME" .
+after_script:
+  - docker images
+  - docker run "$IMAGE_NAME"
+
+before_deploy:
+  - docker login -u "$DOCKER_USERNAME" "$DOCKER_PASSWORD"
+  - docker tag "$IMAGE_NAME" "$IMAGE_NAME:latest"
+  - docker tag "$IMAGE_NAME" "$IMAGE_NAME:$VERSION"
+deploy:
+  provider: script
+  script: docker push "$IMAGE_NAME:latest" && docker push "$IMAGE_NAME:$VERSION"
+  on:
+    branch: master
