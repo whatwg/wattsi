@@ -30,3 +30,12 @@ deploy:
   script: docker push "$IMAGE_NAME:latest" && docker push "$IMAGE_NAME:$VERSION"
   on:
     branch: master
+
+branches:
+  only:
+    - master
+
+notifications:
+  email:
+    on_success: never
+    on_failure: always
