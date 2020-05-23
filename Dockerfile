@@ -10,8 +10,7 @@ WORKDIR /whatwg/wattsi/src
 RUN ./build.sh
 
 RUN rm -rf /whatwg/wattsi/src
-RUN apt-get purge -y fp-compiler fp-units-fcl fp-units-net && \
+RUN apt-get purge -y fp-compiler fp-units-fcl fp-units-net libc6-dev && \
     apt-get autoremove -y
 
 ENTRYPOINT ["/whatwg/wattsi/bin/wattsi"]
-CMD ["--version"]

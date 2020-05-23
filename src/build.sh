@@ -20,15 +20,10 @@ VERSION_FILE="$(get_abs_filename version.inc)"
 PATHS="-Fu${SRC}html -Fi${SRC}html -Fi${SRC}html/entities.inc"
 DEFINES="-dUSEROPES -dLINES -dPARSEERROR"
 
-if [[ -x "$(command -v git)" ]]; then
-  echo "Writing $VERSION_FILE"
-  # If you update the fallback below also update WATTSI_LATEST in
-  # https://github.com/whatwg/html-build/blob/master/build.sh
-  git rev-list --count HEAD > "$VERSION_FILE"
-elif [[ -f "$VERSION_FILE" ]]; then
+if [[ -f "$VERSION_FILE" ]]; then
   echo "$VERSION_FILE exists: version $(cat $VERSION_FILE)"
 else
-  echo "$VERSION_FILE must exist, or git must be installed so we can infer it"
+  echo "$VERSION_FILE must exist"
   exit 1
 fi
 
