@@ -11,6 +11,4 @@ docker:
 	docker build --pull --cache-from whatwg/wattsi --tag whatwg/wattsi .
 
 manual:
-	mkdir -p bin
-	cd src
-	bash ./build.sh
+	bash ./src/build.sh

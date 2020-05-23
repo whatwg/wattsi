@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# cd to the directory containing this script
+cd "$(dirname "$0")"
+
 MAIN="wattsi"
 SRC=""
 #MODE="DEBUG"
@@ -10,16 +13,12 @@ SRC=""
 #MODE="MEMCHECK"
 MODE="RELEASE"
 
-get_abs_filename() {
-  # We need to get absolute paths because different parts of this script
-  # manipulate files from different directories.
-  echo "$(cd "$(dirname "$1")" || exit; pwd)/$(basename "$1")"
-}
-
-VERSION_FILE="$(get_abs_filename version.inc)"
 PATHS="-Fu${SRC}html -Fi${SRC}html -Fi${SRC}html/entities.inc"
 DEFINES="-dUSEROPES -dLINES -dPARSEERROR"
 
+mkdir -p ../bin
+
+VERSION_FILE="version.inc"
 if [[ -f "$VERSION_FILE" ]]; then
   echo "$VERSION_FILE exists: version $(cat $VERSION_FILE)"
 else
