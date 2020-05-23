@@ -1,0 +1,38 @@
+language: bash
+services:
+  - docker
+
+git:
+  depth: false
+
+env:
+  global:
+    - IMAGE_NAME=whatwg/wattsi
+    - DOCKER_USERNAME=domenicdenicola
+    - secure: "TK0STfHBKNN+86PVF93sRBO2LV3vdPQFimVqJWJdRsNUyMBZIXiI97E/jhWPWckTkQ0Q+VQsiKn0Livjj35RH7+e4VTaS15Tp8uQGzK5sgD17G1mP0LiwyPV6hGU19D6/OXqjebMmy0Fd5G57snaO23zDVbMexkKQdYFCB/S2O8yiXmKrPvNwNnQ6qOgrjPyObJcfq6eFLaqgOwpjKvIgN6PvDEZKtQuzk/Z5cGeCIyUp91iR5gxldNGRX8jDtFQIw5qQWzI3dodXVQqxxYdCzjXgpBJY2FtS+qtp4SZzN6vmhd8bAWlDMpJhtFcAHdw870IVhHEO+5A40olHeuuFCp5+2/vchHkanbeAe72t8MQ9phhdVeXI5C3I7AzfxMOBSg0/aDVHK+1WXUBpm8Nd4qLKQDe1cbyQwg7iCGlU60CNaW4WAj3wEj+qti4YLEi0qmFw1SYrxtOPAdLAvbnM6LywIezFHJpthb+S5dmKMS2IN6r7ETGtwePUBwITm6sfEujJ2B+sP88vGTd7T6Upsga1qXY0tzvTuY8Ng511wGezlSLtKpoRkYGDf6LU6/ygd890gVIxcjSume9FMPdzOZMibIyPrXTFj+wC2+0lGlzL2IODZ3EnyACnDFV4ZhEngq43A64N3q9eAxEzFd3O5QtsRJpjRIam82fPanLZ50="
+
+script:
+  - make docker
+  - docker images
+  - docker run "$IMAGE_NAME" --version
+
+before_deploy:
+  - VERSION="$(cat src/version.inc)"
+  - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+  - docker tag "$IMAGE_NAME" "$IMAGE_NAME:latest"
+  - docker tag "$IMAGE_NAME" "$IMAGE_NAME:$VERSION"
+deploy:
+  provider: script
+  skip_cleanup: true
+  script: docker push "$IMAGE_NAME:latest" && docker push "$IMAGE_NAME:$VERSION"
+  on:
+    branch: master
+
+branches:
+  only:
+    - master
+
+notifications:
+  email:
+    on_success: never
+    on_failure: always

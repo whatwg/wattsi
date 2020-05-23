@@ -1,3 +1,8 @@
+#!/bin/bash
+
+# cd to the directory containing this script
+cd "$(dirname "$0")"
+
 MAIN="wattsi"
 SRC=""
 #MODE="DEBUG"
@@ -8,20 +13,17 @@ SRC=""
 #MODE="MEMCHECK"
 MODE="RELEASE"
 
-get_abs_filename() {
-  # We need to get absolute paths because different parts of this script
-  # manipulate files from different directories.
-  echo "$(cd "$(dirname "$1")" || exit; pwd)/$(basename "$1")"
-}
-
-VERSION_FILE="$(get_abs_filename version.inc)"
 PATHS="-Fu${SRC}html -Fi${SRC}html -Fi${SRC}html/entities.inc"
 DEFINES="-dUSEROPES -dLINES -dPARSEERROR"
 
-echo "Writing $VERSION_FILE"
-# If you update the fallback below also update WATTSI_LATEST in
-# https://github.com/whatwg/html-build/blob/master/build.sh
-(git rev-list --count HEAD || echo "91") > "$VERSION_FILE"
+mkdir -p ../bin
+
+VERSION_FILE="version.inc"
+if [[ -f "$VERSION_FILE" ]]; then
+  echo "$VERSION_FILE exists: version $(cat $VERSION_FILE)"
+else
+  echo "$VERSION_FILE must exist"
+  exit 1
+fi
+
 . ${SRC}lib/compile.sh
-echo "Removing $VERSION_FILE"
-rm "$VERSION_FILE"

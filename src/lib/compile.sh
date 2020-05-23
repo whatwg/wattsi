@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # make sure to set MODE ("DEBUG", "PROFILE", or "RELEASE"), MAIN, and SRC before calling this
 # you can add -Fu / -Fi lines to PATHS if you like
 # you can add -dFOO to DEFINES if you like (for any value of FOO)
@@ -27,7 +29,7 @@ IGNORE_MESSAGES=3018,3123,3124,4035,4045,4055,4079,5024,5025,5036,5055,5057,5058
 
 PATHS="-FE${SRC}../bin/ -Fu${SRC}lib -Fi${SRC}lib ${PATHS}"
 BINARY=`basename ${MAIN}`
-if [ "${TESTCMD}" = "" ]; then TESTCMD="bin/${BINARY}"; fi
+if [ "${TESTCMD}" = "" ]; then TESTCMD="bin/${BINARY} --version"; fi
 
 if grep -q ^[0-2][.] <<< $(fpc -iV); then
   echo "ERROR: incorrect fpc version. 3.0.0+ is required."
@@ -51,36 +53,21 @@ then
 
   # DEBUG MODE:
   echo compile: COMPILING - DEBUG MODE
-  fpc ${MAIN}.pas -l- -dDEBUG ${DEFINES} -Ci -Co -CO -Cr -CR -Ct -O- -gt -gl -gh -Sa -veiwnhb ${PATHS} 2>&1 | ${SRC}lib/filter.pl &&
-  cd ${SRC}.. &&
-  #echo compile: Entering directory \`${PWD}/\' &&
-  echo compile: Running ${TESTCMD} &&
-  ${TESTCMD};
-  echo exit value: $?
+  fpc ${MAIN}.pas -l- -dDEBUG ${DEFINES} -Ci -Co -CO -Cr -CR -Ct -O- -gt -gl -gh -Sa -veiwnhb ${PATHS} 2>&1 | ${SRC}lib/filter.pl
 
 elif [ "${MODE}" = "FAST-DEBUG" ]
 then
 
   # FASTER DEBUG MODE:
   echo compile: COMPILING - DEBUG WITH OPTIMISATIONS
-  fpc ${MAIN}.pas -l- -dDEBUG -dOPT ${DEFINES} -Ci -Co -CO -Cr -CR -Ct -O4 -gl -Sa -veiwnhb ${PATHS} 2>&1 | ${SRC}lib/filter.pl &&
-  cd ${SRC}.. &&
-  #echo compile: Entering directory \`${PWD}/\' &&
-  echo compile: Running ${TESTCMD} &&
-  ${TESTCMD};
-  echo exit value: $?
+  fpc ${MAIN}.pas -l- -dDEBUG -dOPT ${DEFINES} -Ci -Co -CO -Cr -CR -Ct -O4 -gl -Sa -veiwnhb ${PATHS} 2>&1 | ${SRC}lib/filter.pl
 
 elif [ "${MODE}" = "FAST" ]
 then
 
   # FASTER MODE:
   echo compile: COMPILING - SIMPLE OPTIMISATIONS ONLY, SYMBOL INFO INCLUDED
-  fpc ${MAIN}.pas -l- -dOPT ${DEFINES} -O4 -Xs- -gl -veiwnhb ${PATHS} 2>&1 | ${SRC}lib/filter.pl &&
-  cd ${SRC}.. &&
-  #echo compile: Entering directory \`${PWD}/\' &&
-  echo compile: Running ${TESTCMD} &&
-  ${TESTCMD};
-  echo exit value: $?
+  fpc ${MAIN}.pas -l- -dOPT ${DEFINES} -O4 -Xs- -gl -veiwnhb ${PATHS} 2>&1 | ${SRC}lib/filter.pl
 
 elif [ "${MODE}" = "VALGRIND-DEBUG" ]
 then
@@ -99,11 +86,7 @@ then
   fpc ${MAIN}.pas -gv -a -l- -dOPT ${DEFINES} -gl -Xs -XX -B -O4 -v0einf -OwALL -Fw${SRC}../bin/opt-feedback ${PATHS} 2>&1 || exit
   rm -f ${SRC}../bin/*.o ${SRC}../bin/*.ppu ${SRC}../bin/*.last &&
   ls -al ${SRC}../bin/${BINARY} &&
-  perl -E 'say ("executable size: " . (-s $ARGV[0]) . " bytes")' ${SRC}../bin/${BINARY} &&
-  cd ${SRC}.. &&
-  #echo compile: Entering directory \`${PWD}/\' &&
-  echo compile: Running ${TESTCMD} &&
-  ${TESTCMD};
+  perl -E 'say ("executable size: " . (-s $ARGV[0]) . " bytes")' ${SRC}../bin/${BINARY}
 
 elif [ "${MODE}" = "PROFILE" ]
 then
@@ -166,11 +149,6 @@ else
   fpc ${MAIN}.pas -a -l- -dRELEASE -dOPT ${DEFINES} -Xs -XX -B -O4 -v0einfm${IGNORE_MESSAGES} -OwALL -Fw${SRC}../bin/opt-feedback ${PATHS} 2>&1 || exit
   rm -f ${SRC}../bin/*.o ${SRC}../bin/*.ppu ${SRC}../bin/*.last &&
   ls -al ${SRC}../bin/${BINARY} &&
-  perl -E 'say ("executable size: " . (-s $ARGV[0]) . " bytes")' ${SRC}../bin/${BINARY} &&
-  cd ${SRC}.. &&
-  #echo compile: Entering directory \`${PWD}/\' &&
-  echo compile: Running ${TESTCMD} &&
-  time ${TESTCMD} &&
-  echo exit value: $?
+  perl -E 'say ("executable size: " . (-s $ARGV[0]) . " bytes")' ${SRC}../bin/${BINARY}
 
 fi
