@@ -3102,54 +3102,54 @@ function Main(): Boolean;
 const
    OtherVariants = [Low(TVariants)..High(TVariants)] - [Low(TVariants)];
 var
-   ParamOffset: Integer = 0;
    SourceFile: AnsiString;
    SourceGitSHA: AnsiString;
    BuildType: AnsiString;
+   CanIUseJSONFilename: AnsiString;
+   MDNJSONFilename: AnsiString;
    Source: TFileData;
    Parser: THTMLParser;
    BigTOC: TElement;
    Documents: array[TVariants] of TDocument;
    {$IFDEF TIMINGS} StartTime: TDateTime; {$ENDIF}
    Variant: TAllVariants;
+   i: integer;
 begin
    Result := False;
-   if (ParamStr(1) = '--quiet') then
+   if ((ParamCount() = 1) and (ParamStr(1) = '--version')) then
    begin
-      Quiet := true;
-      ParamOffset := 1;
+      Writeln('wattsi ' + IntToStr(Version));
+      exit;
    end;
-   if (ParamCount() <> 6) then
-      if (ParamCount() = 7) then
+   for i := 1 to ParamCount() do
+   begin
+      if (ParamStr(i) = '--quiet') then
       begin
-         if (not Quiet) then
+         Quiet := true;
+         continue;
+      end
+      else
+      begin
+         if ((ParamCount() - i) < 5) then
          begin
-            HighlightServerURL := ParamStr(7);
-         end
-      end
-      else
-      if ((ParamCount() = 8) and Quiet) then
-      begin
-         HighlightServerURL := ParamStr(8);
-      end
-      else
-      if ((ParamCount() = 1) and (ParamStr(1) = '--version')) then
-      begin
-         Writeln('wattsi ' + IntToStr(Version));
-         exit;
-      end
-      else
-      begin
-         Writeln('wattsi: invalid arguments');
-         Writeln('syntax:');
-         Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <mdn-spec-links/html.json> [<highlight-server-url>]');
-         Writeln('  wattsi --version');
-         exit;
+            Writeln('wattsi: invalid arguments');
+            Writeln('syntax:');
+            Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <mdn-spec-links/html.json> [<highlight-server-url>]');
+            Writeln('  wattsi --version');
+            exit;
+         end;
+         SourceFile := ParamStr(i);
+         SourceGitSHA := ParamStr(i + 1);
+         OutputDirectory := ParamStr(i + 2);
+         BuildType := ParamStr(i + 3);
+         CanIUseJSONFilename := ParamStr(i + 4);
+         MDNJSONFilename := ParamStr(i + 5);
+         if (ParamCount() = (i + 6)) then
+            HighlightServerURL := ParamStr(i + 6);
+         break;
       end;
-   SourceFile := ParamStr(1 + ParamOffset);
-   SourceGitSHA := ParamStr(2 + ParamOffset);
-   OutputDirectory := ParamStr(3 + ParamOffset);
-   BuildType := ParamStr(4 + ParamOffset);
+   end;
+
    if (not IsEmptyDirectory(OutputDirectory)) then
    begin
       // only act if, when we start, the output directory is empty, to make sure that the
@@ -3160,7 +3160,7 @@ begin
    Features := TFeatureMap.Create(@UTF8StringHash32);
    try
       Inform('Parsing MDN data...');
-      MDNJSONData := ParseJSON(ReadTextFile(ParamStr(6 + ParamOffset)));
+      MDNJSONData := ParseJSON(ReadTextFile(MDNJSONFilename));
       MDNBrowsers := TMDNBrowsers.Create;
       // The browser IDs here must match the ones in the imported JSON data.
       // See the list of browser IDs at https://goo.gl/iDacWP.
@@ -3181,7 +3181,7 @@ begin
       // MDNBrowsers['uc_android'] := 'UC Browser'; // not enough data for features in HTML
       // MDNBrowsers['uc_chinese_android'] := 'Chinese UC Browser'; // not enough data for features in HTML
       MDNBrowsers['webview_android'] := 'WebView Android';
-      PreProcessCanIUseData(ParamStr(5 + ParamOffset));
+      PreProcessCanIUseData(CanIUseJSONFilename);
       {$IFDEF VERBOSE_PREPROCESSORS}
          if (Assigned(Features)) then
             for ID in Features do
