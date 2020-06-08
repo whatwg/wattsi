@@ -46,6 +46,7 @@ uses
 
 var
    Quiet: Boolean = false;
+   SinglePageOnly: Boolean = false;
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
    HighlightServerURL: AnsiString = '';
    OutputDirectory: AnsiString;
@@ -3129,12 +3130,18 @@ begin
          continue;
       end
       else
+      if (ParamStr(i) = '--single-page-only') then
+      begin
+         SinglePageOnly := true;
+         continue;
+      end
+      else
       begin
          if ((ParamCount() - i) < 5) then
          begin
             Writeln('wattsi: invalid arguments');
             Writeln('syntax:');
-            Writeln('  wattsi [--quiet] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <mdn-spec-links/html.json> [<highlight-server-url>]');
+            Writeln('  wattsi [--quiet] [--single-page-only] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <mdn-spec-links/html.json> [<highlight-server-url>]');
             Writeln('  wattsi --version');
             exit;
          end;
@@ -3238,6 +3245,8 @@ begin
                begin
                   for Variant in TVariants do
                   begin
+                     if ((SinglePageOnly) and (Variant <> vHTML)) then
+                        exit;
                      CurrentVariant := Variant;
                      if (Variant = vReview) then
                      begin
@@ -3264,6 +3273,8 @@ begin
                      // multipage...
                      if (Variant <> vSnap) then
                      begin
+                        if (SinglePageOnly) then
+                           exit;
                         {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
                         {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
                         if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
