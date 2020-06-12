@@ -300,7 +300,7 @@ procedure AddMDNBox(const MDNBox: TElement;
                           IsFirst: Boolean);
 var
    MDNData, MDNSupport: TJSONObject;
-   MDNButton, MDNFeature, SupportTable: TElement;
+   MDNButton, MDNFeature, SupportTable, CanIUseRow: TElement;
    MDNEngines: TJSONArray;
    MDNFilename, MDNName, MDNSlug, MDNSubpath, MDNSummary, BrowserID: UTF8String;
    FlagClassName, FlagSymbol, FlagTitle: UTF8String;
@@ -308,6 +308,8 @@ var
    EngineCount, i, j: Integer;
 const
    kMDNURLBase = 'https://developer.mozilla.org/en-US/docs/Web/';
+   kCanIUseURLBase = 'https://caniuse.com/#feat=';
+   kCanIUseText = 'caniuse.com table';
    kFlagClassLessThanTwo = 'less-than-two-engines-flag';
    kFlagClassAll = 'all-engines-flag';
    kEnginesClassLessThanTwo = 'less-than-two-engines-text';
@@ -348,6 +350,10 @@ begin
       //    "slug":    "API/SharedWorker",                <= MDN article slug
       //    "summary": "The SharedWorker interface ...",  <= MDN article summary
       //    "support": {"chrome":{"version_added":"4"},.. <= MDN support data
+      //    "caniuse": {
+      //        "feature": "sharedworkers",               <= caniuse.com anchor
+      //        "title": "Shared Web Workers"             <= caniuse.com title
+      //    },
       //    "title":   "SharedWorker"                     <= MDN article title
       //  },
       //  {
@@ -481,6 +487,15 @@ begin
       for BrowserID in MDNBrowsersForMobileDevices do
          ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
                             Document);
+      if (Assigned(MDNData['caniuse'])) then
+      begin
+         SupportTable.AppendChild(E(eHR));
+         CanIUseRow := E(eSpan, ['data-x', '', 'class', 'caniuse'], Document);
+         CanIUseRow.AppendChild(E(eSpan, ['data-x', ''],
+            [E(eA, ['href', kCanIUseURLBase + UTF8String(MDNData['caniuse']['feature']),
+               'title', MDNData['caniuse']['title']], Document, [T(kCanIUseText)])]));
+         SupportTable.AppendChild(CanIUseRow);
+      end;
    end;
 end;
 
