@@ -89,53 +89,16 @@ const
    kLTAttribute = 'lt';
    kHrefAttribute = 'href';
    kNonNormative = 'This section is non-normative.';
-   kEllipsis = #$22F0;
    Months: array[1..12] of UTF8String = ('January', 'February', 'March', 'April',
                                          'May', 'June', 'July', 'August', 'September',
                                          'October', 'November', 'December');
-   InterestingBrowserCount = 12;
-
-type
-   TBrowser = record
-      Code, Name: UTF8String;
-      TotalUsage: Double;
-      Versions: array of UTF8String;
-   end;
-   TBrowserIndex = 1..InterestingBrowserCount;
-   TImplState = (sYes, sAlmost, sNo, sRemoved, sPolyfill, sUnknown, sPrefix, sDisabled, sNotes);
-   TImplGoodState = sYes..sRemoved;
-   TVersionedState = record
-      State: TImplGoodState;
-      Version: UTF8String;
-      LastVersion: UTF8String;
-   end;
-   TFeature = record
-      CanIUseCode: UTF8String;
-      FirstGoodVersion: array[TBrowserIndex] of TVersionedState;
-      procedure Reset();
-   end;
 
 type
    TElementMap = specialize THashTable <UTF8String, TElement, UTF8StringUtils>;
-   TFeatureMap = specialize THashTable <UTF8String, TFeature, UTF8StringUtils>;
-
-procedure TFeature.Reset();
-var
-   BrowserIndex: TBrowserIndex;
-begin
-   CanIUseCode := '';
-   for BrowserIndex in TBrowserIndex do
-   begin
-      FirstGoodVersion[BrowserIndex].State := sNo;
-      FirstGoodVersion[BrowserIndex].Version := '';
-   end;
-end;
 
 var
    nsNone: TCanonicalString;
    eRef, eList, eChapter: TCanonicalString;
-   Browsers: array[TBrowserIndex] of TBrowser;
-   Features: TFeatureMap;
 
 procedure Inform(Message: UTF8String);
 begin
@@ -959,8 +922,7 @@ var
 
             // Need to ensure an ID because it is normally only ensured for <dfn>s or elements that
             // are cross-referenced at least once. But subdfns can be linked to from outside, so
-            // they need an ID even if they are not referenced. Additionally, the linkage to the
-            // caniuse annotations depends on the ID existing.
+            // they need an ID even if they are not referenced.
             if (Variant <> vDEV) then
                // If this isn't the dev edition, then we need to adjust the ID value to prevent the
                // issue reported at https://github.com/whatwg/html-build/issues/121
@@ -1641,148 +1603,6 @@ var
       until Done;
    end;
 
-   procedure InsertAnnotations();
-   var
-      ID: UTF8String;
-      Feature: TFeature;
-      Container: TElement;
-      Context, Ancestor: TNode;
-      Status, P: TElement;
-      First, Found: Boolean;
-      BrowserIndex: TBrowserIndex;
-   begin
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('START OF ANNOTATIONS'); {$ENDIF}
-      for ID in Features do
-      begin
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('  considering ', ID); {$ENDIF}
-         Feature := Features[ID];
-         if (IDs.Has(ID)) then
-         begin
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('    found'); {$ENDIF}
-            Container := IDs[ID];
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('      Container = @', PtrUInt(Container)); {$ENDIF}
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('      Container.ParentNode = @', PtrUInt(Container.ParentNode)); {$ENDIF}
-            Context := nil;
-            // if you get a crash here, check if there's a place where
-            // we Replace the original element for this ID with a new
-            // element somehow
-            while not Container.IsIdentity(nsHTML, eDiv) and
-                  not Container.IsIdentity(nsHTML, eTD) and
-                  not Container.IsIdentity(nsHTML, eDD) and
-                  not Container.IsIdentity(nsHTML, eLI) and
-                  not Container.IsIdentity(nsHTML, eBody) do
-            begin
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('      Moving up one...'); {$ENDIF}
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('        Container.ParentNode = @', PtrUInt(Container.ParentNode), ' (unchanged)'); {$ENDIF}
-               Context := Container;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('        Context = @', PtrUInt(Context), ' (old Container)'); {$ENDIF}
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('        Container.ParentNode = @', PtrUInt(Container.ParentNode)); {$ENDIF}
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('        = Container := Container.ParentNode ='); {$ENDIF}
-               Container := Container.ParentNode as TElement;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('        New Container = @', PtrUInt(Container)); {$ENDIF}
-            end;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('    examining ancestors'); {$ENDIF}
-            Found := False;
-            Ancestor := Container;
-            while (Assigned(Ancestor)) do
-            begin
-               if ((Ancestor = BigTOC) or (Ancestor = SmallTOC)) then
-               begin
-                  Warn('Found ID ' + ID + ' in a table of contents for annotation that uses URLs:');
-                  if (Feature.CanIUseCode <> '') then
-                     Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
-                  Found := True;
-               end;
-               Ancestor := Ancestor.ParentNode;
-            end;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('    found=', Found); {$ENDIF}
-            if (Found) then
-               continue;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('    building...'); {$ENDIF}
-
-            if (not Assigned(Context)) then
-               Context := Container.FirstChild
-            else
-               Context := Context.NextSibling;
-            if ((Context is TElement) and (TElement(Context).GetAttribute('class').AsString = 'status')) then
-               Status := TElement(Context)
-            else
-            begin
-               Status := E(eDiv, ['class', 'status'], [E(eInput, ['type', 'button', 'value', kEllipsis, 'onclick', 'toggleStatus(this)'])]);
-               Container.InsertBefore(Status, Context);
-            end;
-
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('    built'); {$ENDIF}
-            Found := False;
-            for BrowserIndex in TBrowserIndex do
-            begin
-               if (Feature.FirstGoodVersion[BrowserIndex].Version <> '') then
-               begin
-                  Found := True;
-                  break;
-               end;
-            end;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('    found=', Found); {$ENDIF}
-            if (Found) then
-            begin
-               P := E(eP, ['class', 'support'], [E(eStrong, [T('Support:')]), T(' '), T(Feature.CanIUseCode, Document)]);
-               for BrowserIndex in TBrowserIndex do
-               begin
-                  if (Feature.FirstGoodVersion[BrowserIndex].Version <> '') then
-                     case (Feature.FirstGoodVersion[BrowserIndex].State) of
-                        sYes:
-                           begin
-                              P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' yes'], Document,
-                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
-                                               T(' '),
-                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
-                           end;
-                        sAlmost:
-                           begin
-                              P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' partial'], Document,
-                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document), T(' (limited)')]),
-                                               T(' '),
-                                               E(eSpan, [T(Feature.FirstGoodVersion[BrowserIndex].Version, Document), T('+')])]));
-                           end;
-                        sNo:
-                           begin
-                              P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' no'], Document,
-                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document)]),
-                                               T(' '),
-                                               E(eSpan, [T('None')])]));
-                           end;
-                        sRemoved:
-                           begin
-                              P.AppendChild(E(eSpan, ['class', Browsers[BrowserIndex].Code + ' no'], Document,
-                                              [E(eSpan, [T(Browsers[BrowserIndex].Name, Document), T(' (removed)')]),
-                                               T(' '),
-                                               E(eSpan, [T('-'), T(Feature.FirstGoodVersion[BrowserIndex].LastVersion, Document)])]));
-                           end;
-                     end;
-               end;
-               Status.AppendChild(P);
-            end;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('    considering caniusecode'); {$ENDIF}
-            if (Length(Feature.CanIUseCode) > 0) then
-            begin
-               if (Found) then
-                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('Source: '), E(eA, ['href', 'https://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]))
-               else
-                  Status.AppendChild(E(eP, ['class', 'caniuse'], [T('See also: '), E(eA, ['href', 'https://caniuse.com/#feat=' + Feature.CanIUseCode], Document, [T('caniuse.com')])]));
-            end;
-         end
-         else
-         begin
-            if (Feature.CanIUseCode <> '') then
-            begin
-               Warn('Could not find ID ' + ID + ' for annotation that uses URLs:');
-               Writeln('   https://caniuse.com/#feat=', Feature.CanIUseCode);
-            end;
-         end;
-      end;
-{$IFDEF VERBOSE_ANNOTATIONS} Writeln('END OF ANNOTATIONS'); {$ENDIF}
-   end;
-
 var
    CrossRefNode, CrossRefNodeNext: PCrossReferenceListNode;
    ID, ExtractedData: CutRope;
@@ -1934,8 +1754,6 @@ begin
             {$IFDEF DEBUG} Writeln('Writing xrefs.json...'); {$ENDIF}
             XrefsToJSON(XrefsByDFNAnchor);
          end;
-         {$IFDEF DEBUG} Writeln('Inserting annotations...'); {$ENDIF}
-         InsertAnnotations();
          {$IFDEF DEBUG} Writeln('Inserting tables of contents...'); {$ENDIF}
          if (Assigned(BigTOCBookmark)) then
          begin
@@ -2912,193 +2730,6 @@ begin
    SectionNames.Free();
 end;
 
-function CanIUseURLToID(const SpecURL: UTF8String; out ID: UTF8String): Boolean;
-var
-   HashIndex: Cardinal;
-begin
-   ID := '';
-   Result := True;
-   if (Pos('https://html.spec.whatwg.org/', SpecURL) = 1) then
-   begin
-      HashIndex := Pos('#', SpecURL); // $R-
-      if (HashIndex > 0) then
-      begin
-         ID := Copy(SpecURL, HashIndex+1, Length(SpecURL)-HashIndex);
-      end
-      else
-         Result := False;
-   end
-   else
-   if (SpecURL = 'http://www.w3.org/TR/MathML/') then
-   begin
-      ID := 'mathml';
-   end
-   else
-      Result := False;
-   {$IFDEF VERBOSE_ID_FINDER}
-      if (not Result) then
-         Writeln('Could not find ID in: ', SpecURL);
-   {$ENDIF}
-end;
-
-// http://wiki.freepascal.org/UTF8_strings_and_characters#Search_and_copy
-// TODO: SplitInHalf is expensive, should use ropes. https://github.com/whatwg/wattsi/issues/40
-function SplitInHalf(Txt, Separator: UTF8String; out Half1, Half2: UTF8String): Boolean;
-var
-  i: Integer;
-begin
-  i := Pos(Separator, Txt);
-  Result := i > 0;
-  if Result then
-  begin
-    Half1 := Copy(Txt, 1, i-1);
-    Half2 := Copy(Txt, i+Length(Separator), Length(Txt));
-  end;
-end;
-
-procedure PreProcessCanIUseData(const CanIUseJSONFilename: AnsiString);
-var
-   CanIUseData, Agent, Version, FeatureData: TJSON;
-   Browser: TBrowser;
-   BrowserCode, FeatureCode, SpecURL, RawState, ID, LowVersion, HighVersion: UTF8String;
-   CurrentUsage: Double;
-   BrowserIndex, CopyIndex: TBrowserIndex;
-   VersionIndex, StateIndex: Cardinal;
-   Feature: TFeature;
-   States: set of TImplState;
-   NewState: TImplGoodState;
-begin
-   Inform('Parsing caniuse.com data...');
-   CanIUseData := ParseJSON(ReadTextFile(CanIUseJSONFilename));
-   try
-      Inform('Processing caniuse.com data...');
-      for BrowserIndex := Low(Browsers) to High(Browsers) do
-      begin
-         Browsers[BrowserIndex].Code := '';
-         Browsers[BrowserIndex].Name := '<>';
-         Browsers[BrowserIndex].TotalUsage := 0.0;
-         SetLength(Browsers[BrowserIndex].Versions, 0);
-      end;
-      if (not (CanIUseData['agents'] is TJSONObject)) then
-         raise ESyntaxError.Create('caniuse.com json file is missing agents data');
-      for BrowserCode in TJSONObject(CanIUseData['agents']).Keys do
-      begin
-         Agent := CanIUseData['agents'][BrowserCode];
-         if (not (Agent is TJSONObject)) then
-            raise ESyntaxError.Create('caniuse.com json file has bogus data for agent');
-         if (not (Agent['versions'] is TJSONArray)) then
-            raise ESyntaxError.Create('caniuse.com json file has bogus data for agent versions');
-         if (Agent['versions'].Length > 0) then
-         begin
-            Browser.TotalUsage := 0.0;
-            if (not (Agent['usage_global'] is TJSONObject)) then
-               raise ESyntaxError.Create('caniuse.com json file has bogus data for agent usage');
-            for CurrentUsage in Agent['usage_global'] do
-               Browser.TotalUsage := Browser.TotalUsage + CurrentUsage;
-            for BrowserIndex := Low(Browsers) to High(Browsers) do
-            begin
-               if (Browsers[BrowserIndex].TotalUsage < Browser.TotalUsage) then
-               begin
-                  Browser.Code := BrowserCode;
-                  if (not (Agent['browser'] is TJSONString)) then
-                     raise ESyntaxError.Create('caniuse.com json file has bogus data for agent name');
-                  Browser.Name := Agent['browser'];
-                  VersionIndex := 0;
-                  SetLength(Browser.Versions, Agent['versions'].Length);
-                  for Version in Agent['versions'] do
-                     if (Assigned(Version)) then
-                     begin
-                        Browser.Versions[VersionIndex] := Version;
-                        Inc(VersionIndex);
-                     end;
-                  SetLength(Browser.Versions, VersionIndex);
-                  if (BrowserIndex < High(BrowserIndex)) then
-                     for CopyIndex := High(BrowserIndex) downto Succ(BrowserIndex) do
-                        Browsers[CopyIndex] := Browsers[Pred(CopyIndex)];
-                  Browsers[BrowserIndex] := Browser;
-                  break;
-               end;
-            end;
-         end;
-      end;
-      {$IFDEF VERBOSE_CANIUSE_PARSE}
-         for BrowserIndex := Low(Browsers) to High(Browsers) do
-         begin
-            Writeln('Browser #', BrowserIndex, ': ', Browsers[BrowserIndex].Name, ' ("', Browsers[BrowserIndex].Code, '"): usage: ', Browsers[BrowserIndex].TotalUsage:3:2, '%');
-            if (Length(Browsers[BrowserIndex].Versions) > 0) then
-               for VersionIndex := Low(Browsers[BrowserIndex].Versions) to High(Browsers[BrowserIndex].Versions) do // $R-
-                  Writeln('  ', Browsers[BrowserIndex].Versions[VersionIndex]);
-         end;
-      {$ENDIF}
-      if (not (CanIUseData['data'] is TJSONObject)) then
-         raise ESyntaxError.Create('caniuse.com json file is missing feature data');
-      for FeatureCode in TJSONObject(CanIUseData['data']).Keys do
-      begin
-         FeatureData := CanIUseData['data'][FeatureCode];
-         SpecURL := FeatureData['spec'];
-         if (not CanIUseURLToID(SpecURL, ID)) then
-            continue;
-         if (Features.Has(ID)) then
-            Feature := Features[ID]
-         else
-            Feature.Reset();
-         Feature.CanIUseCode := FeatureCode;
-         for BrowserIndex in TBrowserIndex do
-         begin
-            Feature.FirstGoodVersion[BrowserIndex].Version := '';
-            Feature.FirstGoodVersion[BrowserIndex].LastVersion := '';
-            Browser := Browsers[BrowserIndex];
-            for VersionIndex := High(Browsers[BrowserIndex].Versions) downto Low(Browsers[BrowserIndex].Versions) do // $R-
-            begin
-               RawState := FeatureData['stats'][Browser.Code][Browser.Versions[VersionIndex]];
-               States := [];
-               if (Length(RawState) > 0) then
-                  for StateIndex := 1 to Length(RawState) do // $R-
-                     case RawState[StateIndex] of
-                       'y': Include(States, sYes);
-                       'a': Include(States, sAlmost);
-                       'n': Include(States, sNo);
-                       'p': Include(States, sPolyfill);
-                       'u': Include(States, sUnknown);
-                       'x': Include(States, sPrefix);
-                       'd': Include(States, sDisabled);
-                       '#', '0'..'9': Include(States, sNotes);
-                     end;
-               if ((States * [sYes, sAlmost, sNo, sPrefix, sDisabled] <> []) and
-                   (not (sUnknown in States))) then
-               begin
-                  if (States * [sYes, sAlmost, sNo, sPrefix, sDisabled] = [sYes]) then
-                     NewState := sYes
-                  else
-                  if (States * [sAlmost, sNo, sPrefix, sDisabled] = [sAlmost]) then
-                     NewState := sAlmost
-                  else
-                     NewState := sNo;
-                  if (not SplitInHalf(Browser.Versions[VersionIndex], '-', LowVersion, HighVersion)) then
-                  begin
-                     LowVersion := Browser.Versions[VersionIndex];
-                     HighVersion := LowVersion;
-                  end;
-                  if (Feature.FirstGoodVersion[BrowserIndex].Version = '') then
-                  begin
-                     Feature.FirstGoodVersion[BrowserIndex].LastVersion := HighVersion;
-                     if ((VersionIndex <> High(Browsers[BrowserIndex].Versions)) and (NewState <> sNo)) then
-                       NewState := sRemoved;
-                  end;
-                  if ((Feature.FirstGoodVersion[BrowserIndex].Version <> '') and (Feature.FirstGoodVersion[BrowserIndex].State <> NewState)) then
-                     break;
-                  Feature.FirstGoodVersion[BrowserIndex].Version := LowVersion;
-                  Feature.FirstGoodVersion[BrowserIndex].State := NewState;
-               end;
-            end;
-         end;
-         Features[ID] := Feature;
-      end;
-   finally
-      CanIUseData.Free();
-   end;
-end;
-
 function Main(): Boolean;
 const
    OtherVariants = [Low(TVariants)..High(TVariants)] - [Low(TVariants)];
@@ -3164,7 +2795,6 @@ begin
       Writeln('wattsi: output directory (second argument) must be an existing empty directory');
       exit;
    end;
-   Features := TFeatureMap.Create(@UTF8StringHash32);
    try
       Inform('Parsing MDN data...');
       MDNJSONData := ParseJSON(ReadTextFile(MDNJSONFilename));
@@ -3188,18 +2818,6 @@ begin
       // MDNBrowsers['uc_android'] := 'UC Browser'; // not enough data for features in HTML
       // MDNBrowsers['uc_chinese_android'] := 'Chinese UC Browser'; // not enough data for features in HTML
       MDNBrowsers['webview_android'] := 'WebView Android';
-      PreProcessCanIUseData(CanIUseJSONFilename);
-      {$IFDEF VERBOSE_PREPROCESSORS}
-         if (Assigned(Features)) then
-            for ID in Features do
-            begin
-               Write('#', ID, ':');
-               for BrowserIndex := Low(Features[ID].FirstGoodVersion) to High(Features[ID].FirstGoodVersion) do
-                  if (Features[ID].FirstGoodVersion[BrowserIndex] <> '') then
-                     Write(' ', Browsers[BrowserIndex].Name, ' ', Features[ID].FirstGoodVersion[BrowserIndex], '+ ');
-               Writeln();
-            end;
-      {$ENDIF}
       nsNone := Intern('');
       eList := Intern('list');
       eChapter := Intern('chapter');
@@ -3319,7 +2937,7 @@ begin
          Source.Destroy();
       end;
    finally
-      Features.Free();
+      ;
    end;
 end;
 
