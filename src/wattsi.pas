@@ -2795,149 +2795,145 @@ begin
       Writeln('wattsi: output directory (second argument) must be an existing empty directory');
       exit;
    end;
+   Inform('Parsing MDN data...');
+   MDNJSONData := ParseJSON(ReadTextFile(MDNJSONFilename));
+   MDNBrowsers := TMDNBrowsers.Create;
+   // The browser IDs here must match the ones in the imported JSON data.
+   // See the list of browser IDs at https://goo.gl/iDacWP.
+   MDNBrowsers['chrome'] := 'Chrome';
+   MDNBrowsers['chrome_android'] := 'Chrome Android';
+   MDNBrowsers['edge_blink'] := 'Edge';
+   MDNBrowsers['edge'] := 'Edge (Legacy)';
+   MDNBrowsers['firefox'] := 'Firefox';
+   MDNBrowsers['firefox_android'] := 'Firefox Android';
+   MDNBrowsers['ie'] := 'Internet Explorer';
+   // MDNBrowsers['nodejs'] := 'Node.js'; // no data for features in HTML
+   MDNBrowsers['opera'] := 'Opera';
+   MDNBrowsers['opera_android'] := 'Opera Android';
+   // MDNBrowsers['qq_android'] := 'QQ Browser'; // not enough data for features in HTML
+   MDNBrowsers['safari'] := 'Safari';
+   MDNBrowsers['safari_ios'] := 'Safari iOS';
+   MDNBrowsers['samsunginternet_android'] := 'Samsung Internet';
+   // MDNBrowsers['uc_android'] := 'UC Browser'; // not enough data for features in HTML
+   // MDNBrowsers['uc_chinese_android'] := 'Chinese UC Browser'; // not enough data for features in HTML
+   MDNBrowsers['webview_android'] := 'WebView Android';
+   nsNone := Intern('');
+   eList := Intern('list');
+   eChapter := Intern('chapter');
+   RegisterHTMLElement('ref', eRef, THTMLElement, 0);
+   Inform('Parsing...');
+   {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+   Source := ReadFile(SourceFile);
    try
-      Inform('Parsing MDN data...');
-      MDNJSONData := ParseJSON(ReadTextFile(MDNJSONFilename));
-      MDNBrowsers := TMDNBrowsers.Create;
-      // The browser IDs here must match the ones in the imported JSON data.
-      // See the list of browser IDs at https://goo.gl/iDacWP.
-      MDNBrowsers['chrome'] := 'Chrome';
-      MDNBrowsers['chrome_android'] := 'Chrome Android';
-      MDNBrowsers['edge_blink'] := 'Edge';
-      MDNBrowsers['edge'] := 'Edge (Legacy)';
-      MDNBrowsers['firefox'] := 'Firefox';
-      MDNBrowsers['firefox_android'] := 'Firefox Android';
-      MDNBrowsers['ie'] := 'Internet Explorer';
-      // MDNBrowsers['nodejs'] := 'Node.js'; // no data for features in HTML
-      MDNBrowsers['opera'] := 'Opera';
-      MDNBrowsers['opera_android'] := 'Opera Android';
-      // MDNBrowsers['qq_android'] := 'QQ Browser'; // not enough data for features in HTML
-      MDNBrowsers['safari'] := 'Safari';
-      MDNBrowsers['safari_ios'] := 'Safari iOS';
-      MDNBrowsers['samsunginternet_android'] := 'Samsung Internet';
-      // MDNBrowsers['uc_android'] := 'UC Browser'; // not enough data for features in HTML
-      // MDNBrowsers['uc_chinese_android'] := 'Chinese UC Browser'; // not enough data for features in HTML
-      MDNBrowsers['webview_android'] := 'WebView Android';
-      nsNone := Intern('');
-      eList := Intern('list');
-      eChapter := Intern('chapter');
-      RegisterHTMLElement('ref', eRef, THTMLElement, 0);
-      Inform('Parsing...');
-      {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-      Source := ReadFile(SourceFile);
+      Parser := THTMLParser.Create();
+      Parser.RegisterProperietaryVoidElements([eRef]);
       try
-         Parser := THTMLParser.Create();
-         Parser.RegisterProperietaryVoidElements([eRef]);
          try
-            try
-               Parser.SpoonFeed(Source.Start, Source.Length);
-               Documents[Low(TVariants)] := Parser.Parse();
-            except
-               on E: ESyntaxError do
-               begin
-                  Writeln('Parse Error: ', E.Message);
-                  exit;
-               end
-               else
-               begin
-                  ReportCurrentException();
-                  exit;
-               end;
+            Parser.SpoonFeed(Source.Start, Source.Length);
+            Documents[Low(TVariants)] := Parser.Parse();
+         except
+            on E: ESyntaxError do
+            begin
+               Writeln('Parse Error: ', E.Message);
+               exit;
+            end
+            else
+            begin
+               ReportCurrentException();
+               exit;
             end;
-         finally
-            Parser.Free();
          end;
+      finally
+         Parser.Free();
+      end;
+      {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+      if (BuildType = 'default') then
+      begin
+         {$IFDEF TIMINGS} Writeln('Cloning...'); {$ENDIF}
+         {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+         for Variant in OtherVariants do
+            Documents[Variant] := Documents[Low(TVariants)].CloneNode(True);
          {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-         if (BuildType = 'default') then
-         begin
-            {$IFDEF TIMINGS} Writeln('Cloning...'); {$ENDIF}
-            {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-            for Variant in OtherVariants do
-               Documents[Variant] := Documents[Low(TVariants)].CloneNode(True);
-            {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-         end;
+      end;
+      try
          try
-            try
-               // gen...
-               if (BuildType = 'default') then
+            // gen...
+            if (BuildType = 'default') then
+            begin
+               for Variant in TVariants do
                begin
-                  for Variant in TVariants do
+                  if ((SinglePageOnly) and (Variant <> vHTML)) then
+                     exit;
+                  CurrentVariant := Variant;
+                  if (Variant = vReview) then
                   begin
-                     if ((SinglePageOnly) and (Variant <> vHTML)) then
-                        exit;
-                     CurrentVariant := Variant;
-                     if (Variant = vReview) then
-                     begin
-                        continue;
-                     end;
-                     // Create this directory early as ProcessDocument relies on it to store
-                     // /multipage-dev/search-index.json
-                     if (Variant <> vSnap) then
-                     begin
-                        MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
-                     end;
-                     Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
-                     {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                     ProcessDocument(Documents[Variant], Variant, BigTOC, SourceGitSHA); // $R-
-                     {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-                     // output...
-                     if (Variant <> vDEV) then
-                     begin
-                        {$IFDEF TIMINGS} Writeln('Saving single-page version...'); {$ENDIF}
-                        {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                        Save(Documents[Variant], OutputDirectory + '/index-' + kSuffixes[Variant]);
-                        {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-                     end;
-                     // multipage...
-                     if (Variant <> vSnap) then
-                     begin
-                        if (SinglePageOnly) then
-                           exit;
-                        {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
-                        {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
-                        if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
-                           raise EAbort.Create('Could not split specification');
-                        {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
-                     end;
+                     continue;
                   end;
-               end
-               else
-               begin
-                  Assert(BuildType = 'review');
-                  // Skip timing information here as it should be roughly equivalent
-                  Inform('Generating ' + Uppercase(kSuffixes[vReview]) + ' exclusively...');
-                  ProcessDocument(Documents[Low(TVariants)], vReview, BigTOC, SourceGitSHA);
-                  Save(Documents[Low(TVariants)], OutputDirectory + '/index-' + kSuffixes[vReview]);
+                  // Create this directory early as ProcessDocument relies on it to store
+                  // /multipage-dev/search-index.json
+                  if (Variant <> vSnap) then
+                  begin
+                     MkDir(OutputDirectory + '/multipage-' + kSuffixes[Variant]);
+                  end;
+                  Inform('Generating ' + Uppercase(kSuffixes[Variant]) + ' variant...');
+                  {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                  ProcessDocument(Documents[Variant], Variant, BigTOC, SourceGitSHA); // $R-
+                  {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                  // output...
+                  if (Variant <> vDEV) then
+                  begin
+                     {$IFDEF TIMINGS} Writeln('Saving single-page version...'); {$ENDIF}
+                     {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                     Save(Documents[Variant], OutputDirectory + '/index-' + kSuffixes[Variant]);
+                     {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                  end;
+                  // multipage...
+                  if (Variant <> vSnap) then
+                  begin
+                     if (SinglePageOnly) then
+                        exit;
+                     {$IFDEF TIMINGS} Writeln('Splitting spec...'); {$ENDIF}
+                     {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+                     if (not Split(Documents[Variant], BigTOC, OutputDirectory + '/multipage-' + kSuffixes[Variant] + '/')) then
+                        raise EAbort.Create('Could not split specification');
+                     {$IFDEF TIMINGS} Writeln('Elapsed time: ', MillisecondsBetween(StartTime, Now()), 'ms'); {$ENDIF}
+                  end;
                end;
-               Result := True;
-            except
-               on E: EAbort do
-                  Writeln('Aborting.');
-               else
-               begin
-                  ReportCurrentException();
-               end;
+            end
+            else
+            begin
+               Assert(BuildType = 'review');
+               // Skip timing information here as it should be roughly equivalent
+               Inform('Generating ' + Uppercase(kSuffixes[vReview]) + ' exclusively...');
+               ProcessDocument(Documents[Low(TVariants)], vReview, BigTOC, SourceGitSHA);
+               Save(Documents[Low(TVariants)], OutputDirectory + '/index-' + kSuffixes[vReview]);
             end;
-         finally
-            try
-               if (BuildType = 'default') then
-               begin
-                  for Variant in TVariants do
-                     Documents[Variant].Free();
-               end
-               else
-               begin
-                  Documents[Low(TVariants)].Free();
-               end;
-            except
+            Result := True;
+         except
+            on E: EAbort do
+               Writeln('Aborting.');
+            else
+            begin
                ReportCurrentException();
             end;
          end;
       finally
-         Source.Destroy();
+         try
+            if (BuildType = 'default') then
+            begin
+               for Variant in TVariants do
+                  Documents[Variant].Free();
+            end
+            else
+            begin
+               Documents[Low(TVariants)].Free();
+            end;
+         except
+            ReportCurrentException();
+         end;
       end;
    finally
-      ;
+      Source.Destroy();
    end;
 end;
 
