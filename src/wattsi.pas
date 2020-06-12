@@ -2737,7 +2737,6 @@ var
    SourceFile: AnsiString;
    SourceGitSHA: AnsiString;
    BuildType: AnsiString;
-   CanIUseJSONFilename: AnsiString;
    MDNJSONFilename: AnsiString;
    Source: TFileData;
    Parser: THTMLParser;
@@ -2768,11 +2767,11 @@ begin
       end
       else
       begin
-         if ((ParamCount() - i) < 5) then
+         if ((ParamCount() - i) < 4) then
          begin
             Writeln('wattsi: invalid arguments');
             Writeln('syntax:');
-            Writeln('  wattsi [--quiet] [--single-page-only] <source-file> <source-git-sha> <output-directory> <default-or-review> <caniuse.json> <mdn-spec-links/html.json> [<highlight-server-url>]');
+            Writeln('  wattsi [--quiet] [--single-page-only] <source-file> <source-git-sha> <output-directory> <default-or-review> <mdn-spec-links/html.json> [<highlight-server-url>]');
             Writeln('  wattsi --version');
             exit;
          end;
@@ -2780,10 +2779,9 @@ begin
          SourceGitSHA := ParamStr(i + 1);
          OutputDirectory := ParamStr(i + 2);
          BuildType := ParamStr(i + 3);
-         CanIUseJSONFilename := ParamStr(i + 4);
-         MDNJSONFilename := ParamStr(i + 5);
-         if (ParamCount() = (i + 6)) then
-            HighlightServerURL := ParamStr(i + 6);
+         MDNJSONFilename := ParamStr(i + 4);
+         if (ParamCount() = (i + 5)) then
+            HighlightServerURL := ParamStr(i + 5);
          break;
       end;
    end;
