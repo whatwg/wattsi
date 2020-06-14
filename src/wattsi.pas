@@ -1005,24 +1005,30 @@ var
 
       MDNBox := E(eAside);
 
-      if (Element.HasProperties(propHeading)) then
+      if (Element.HasProperties(propHeading) or
+         HasAncestorWithProperties(Element, propHeading)) then
       begin
-         // If this is a heading, we insert the annotation after the element
-         // being annotated. When generating multipage output, inserting the
+         // If the element we want to annotate is either (1) a descendant of
+         // heading, or else (2) is itself a heading, we insert the annotation
+         // after the heading. When generating multipage output, inserting the
          // annotation after the heading ensures that it ends up in the right
          // file. It can otherwise incorrectly end up in the previous split.
          ClassName := 'mdn-anno wrapped';
          MDNBox.SetAttribute('class', ClassName);
-         if (Element.NextElementSibling().GetAttribute('class').AsString = ClassName) then
+         Candidate := Element;
+         while not TElement(Candidate).HasProperties(propHeading) do
+            Candidate := Candidate.ParentNode;
+         TargetAncestor := TElement(Candidate);
+         if (TargetAncestor.NextElementSibling().GetAttribute('class').AsString = ClassName) then
          begin
             // If there's already an MDN box at the point where we want this,
             // then just re-use it (instead of creating another one).
-            MDNBox := TElement(Element.NextElementSibling());
+            MDNBox := TargetAncestor.NextElementSibling();
             IsFirst := False;
          end
          else
          begin
-            TElement(Element.ParentNode).InsertBefore(MDNBox, Element.NextSibling);
+            TElement(TargetAncestor.ParentNode).InsertBefore(MDNBox, TargetAncestor.NextSibling);
             IsFirst := True;
          end
       end
