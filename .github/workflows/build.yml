@@ -1,0 +1,35 @@
+name: Build
+on:
+  pull_request:
+    branches:
+    - master
+  push:
+    branches:
+    - master
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-20.04
+    env:
+      IMAGE_NAME: whatwg/wattsi
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: docker build
+      run: make docker
+    # This also serves as a *very* minimal test of the executable.
+    - name: docker run (get version)
+      run: |
+        WATTSI_VERSION=$(docker run "$IMAGE_NAME" --version | sed 's/^wattsi //')
+        echo "::set-env name=WATTSI_VERSION::$WATTSI_VERSION"
+    - name: docker tag
+      run: |
+        docker tag "$IMAGE_NAME" "$IMAGE_NAME:$WATTSI_VERSION"
+        docker tag "$IMAGE_NAME" "$IMAGE_NAME:latest"
+    - name: docker push
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+      run: |
+        docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_PASSWORD }}
+        docker push "$IMAGE_NAME:$WATTSI_VERSION"
+        docker push "$IMAGE_NAME:latest"
