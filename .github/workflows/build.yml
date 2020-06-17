@@ -21,7 +21,7 @@ jobs:
     # This also serves as a *very* minimal test of the executable.
     - name: docker run (get version)
       run: |
-        WATTSI_VERSION=$(docker run "$IMAGE_NAME" --version | sed 's/^wattsi //')
+        WATTSI_VERSION=$(docker run "$IMAGE_NAME" --version | cut -d' ' -f2)
         echo "::set-env name=WATTSI_VERSION::$WATTSI_VERSION"
     - name: docker tag
       run: |
