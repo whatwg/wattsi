@@ -134,6 +134,19 @@ begin
    Result := True;
 end;
 
+function HasAncestorWithProperties(Element: TNode; const TestProperties: TElementProperties): Boolean;
+begin
+   repeat
+      Element := Element.ParentNode;
+      if (not (Element is TElement)) then
+      begin
+         Result := False;
+         exit;
+      end;
+   until (TElement(Element).HasProperties(TestProperties));
+   Result := True;
+end;
+
 procedure AddMDNBrowserRow(const SupportTable: TElement;
                            const BrowserID: UTF8String;
                            const YesNoUnknown: UTF8String;
