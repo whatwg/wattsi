@@ -2391,7 +2391,7 @@ begin
    Assign(F, FileName);
    Rewrite(F);
    Write(F, '<!DOCTYPE html>');
-   Current := Document.DocumentElement;
+   Current := Document.GetDocumentElement();
    CurrentElement := nil;
    CurrentlyInHighlightedElement := False;
    CurrentHighlightedElementJSON := '';
@@ -2531,8 +2531,8 @@ begin
    Link := ConstructHTMLElement(eScript);
    Link.SetAttribute('src', '/link-fixup.js');
    Link.SetAttribute('defer', '');
-   FirstChild := Document.DocumentElement.FirstChild as TElement;
-   Document.DocumentElement.InsertBefore(Link, FirstChild);
+   FirstChild := Document.GetDocumentElement().FirstChild as TElement;
+   Document.GetDocumentElement().InsertBefore(Link, FirstChild);
    // find body
    Current := Document;
    Inform('Splitting...');
@@ -2664,7 +2664,7 @@ begin
    end;
    // save table of contents section
    SectionDoc := Document.CloneNode(True);
-   SectionDoc.DocumentElement.SetAttribute('class', 'split index');
+   SectionDoc.GetDocumentElement().SetAttribute('class', 'split index');
    Save(SectionDoc, Base + kIndexFilename);
    SectionDoc.Free();
    BigTOC.Remove();
@@ -2674,7 +2674,7 @@ begin
    begin
       SectionName := CurrentSection.GetAttribute(kFileNameAttribute).AsString;
       SectionDoc := Document.CloneNode(True);
-      SectionDoc.DocumentElement.SetAttribute('class', 'split');
+      SectionDoc.GetDocumentElement().SetAttribute('class', 'split');
       // find body
       Current := SectionDoc;
       repeat
