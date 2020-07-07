@@ -117,8 +117,8 @@ type
       function CloneNode(const Deep: Boolean = False): TDocument; override;
       function AppendChild(const NewNode: TNode): TNode; inline;
       function RemoveChild(const OldNode: TNode): TNode; inline;
-      property DocType: TDocumentType read FChildNodes.FDocType;
-      property DocumentElement: TElement read FChildNodes.FDocumentElement;
+      function GetDocType(): TDocumentType; inline;
+      function GetDocumentElement(): TElement; inline;
       property DocumentMode: TDocumentMode read FDocumentMode;
       property FirstChild: TNode read GetFirstChild;
       property LastChild: TNode read GetLastChild;
@@ -750,6 +750,16 @@ begin
    else
       Result := nil;
    Assert(Assigned(Result) = (FChildNodes.Length > 0));
+end;
+
+function TDocument.GetDocType(): TDocumentType;
+begin
+   Result := FChildNodes.FDocType;
+end;
+
+function TDocument.GetDocumentElement(): TElement;
+begin
+   Result := FChildNodes.FDocumentElement;
 end;
 
 function TDocument.GetFirstElementChild(): TElement;
