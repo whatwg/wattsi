@@ -65,7 +65,7 @@ type
           rfUTF8Inline: (InlineIndex: TUTF8InlineIndexPlusOne; InlineCodepointLength: TZeroableUTF8SequenceLength);
           rfCodepoints: (CodepointsIndex: TCodepointsIndexPlusOne; CodepointsIndexIncluded: Boolean);
       end;
-      function Serialise(const FirstFragment: PRopeFragment): UTF8String;
+      class function Serialise(const FirstFragment: PRopeFragment): UTF8String; static;
    end;
 
    TRopePointer = record
@@ -190,7 +190,7 @@ begin
 end;
 
 
-function RopeInternals.Serialise(const FirstFragment: PRopeFragment): UTF8String;
+class function RopeInternals.Serialise(const FirstFragment: PRopeFragment): UTF8String;
 var
    NeededLength, Offset, Index: Cardinal;
    CurrentFragment: RopeInternals.PRopeFragment;
