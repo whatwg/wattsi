@@ -1003,7 +1003,7 @@ var
          // No MDN article has a link to this ID.
          exit;
 
-      MDNBox := E(eAside);
+      MDNBox := E(eDiv);
 
       if (Element.HasProperties(propHeading) or
          HasAncestorWithProperties(Element, propHeading)) then
