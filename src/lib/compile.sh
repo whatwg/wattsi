@@ -6,7 +6,7 @@
 # you can set TESTCMD if you want to run a particular command instead of the obvious
 
 # list of numbered fpc (hint/warning) messages to suppress
-IGNORE_MESSAGES=3018,3123,3124,4035,4045,4055,4079,5024,5025,5036,5055,5057,5058,5059,5071,5092,5093
+IGNORE_MESSAGES=3018,3123,3124,4035,4045,4055,4079,5024,5025,5036,5055,5057,5058,5059,5071,5092,5093,6058
 # 3018 Warning: Constructor should be public
 # 3123 Hint: "open array" not yet supported inside inline procedure/function
 # 3124 Hint: Inlining disabled
@@ -24,6 +24,7 @@ IGNORE_MESSAGES=3018,3123,3124,4035,4045,4055,4079,5024,5025,5036,5055,5057,5058
 # 5071 Note: Private type "arg1.arg2" never used
 # 5092 Hint: Variable "arg1" of a managed type does not seem to be initialized
 # 5093 Warning: function result variable of a managed type does not seem to initialized
+# 6058 Note: Call to subroutine "arg1" marked as inline is not inlined
 
 # XXX -O4 should have LEVEL4 equivalent
 
