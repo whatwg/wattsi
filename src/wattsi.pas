@@ -1288,9 +1288,9 @@ var
                         begin
                            if (InSkippedNode) then
                               Fail('Nested <dfn> or <span> elements in heading ' + LastSeenHeadingID);
-                           InSkippedNode := True;
                            if (CandidateChild.HasChildNodes()) then
                            begin
+                              InSkippedNode := True;
                               CandidateChild := (CandidateChild as TElement).FirstChild;
                               SelectedForTransfer := CandidateChild;
                            end
