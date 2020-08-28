@@ -1286,8 +1286,6 @@ var
                      begin
                         if ((CandidateChild is TElement) and ((TElement(CandidateChild).IsIdentity(nsHTML, eDFN)) or (TElement(CandidateChild).IsIdentity(nsHTML, eSpan)))) then
                         begin
-                           if (InSkippedNode) then
-                              Fail('Nested <dfn> or <span> elements in heading ' + LastSeenHeadingID);
                            InSkippedNode := True;
                            if (CandidateChild.HasChildNodes()) then
                            begin
