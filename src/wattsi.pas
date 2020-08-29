@@ -1091,6 +1091,19 @@ var
    const
       CommitSnapshotBaseURL: AnsiString = '/commit-snapshots/';
       SourceGitBaseURL: AnsiString = 'https://github.com/whatwg/html/commit/';
+      kExport = 'export';
+      kDataExport = 'data-export';
+      kFor = 'for';
+      kDataDFNFor = 'data-dfn-for';
+      kDataDFNType = 'data-dfn-type';
+      // NOTE: The following array has the subset of dfn types we actually use
+      // in HTML currently. The full set of ~40 supported dfn types is at
+      // https://github.com/tabatkins/bikeshed/blob/master/bikeshed/config/dfnTypes.py#L7
+      // So if we ever start using any types other than the following in HTML,
+      // then at that time we will also need to update this array.
+      kDFNTypes: array[1..9] of UTF8String =
+         ('element', 'element-attr', 'event', 'interface', 'extended-attribute',
+          'method', 'attribute', 'enum-value', 'http-header');
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
@@ -1104,6 +1117,7 @@ var
       DFNEntry: TDFNEntry;
       ID, HeadingText, ParentHeadingText, SectionNumber, ParentSectionNumber: UTF8String;
       ClassValue: String = '';
+      DFNType: UTF8String = '';
    begin
       Result := True;
       if (Node is TElement) then
@@ -1399,6 +1413,23 @@ var
          begin
             if (Element.HasAttribute(kLTAttribute)) then
                Fail('<dfn> with lt="" found, use data-x="" instead; dfn is ' + Describe(Element));
+            if (Element.HasAttribute(kFor)) then
+            begin
+               ExtractedData := Element.GetAttribute(kFor);
+               Element.SetAttributeDestructively(kDataDFNFor, ExtractedData);
+               Element.RemoveAttribute(kFor);
+            end;
+            if (Element.HasAttribute(kExport)) then
+            begin
+               Element.SetAttribute(kDataExport, '');
+               Element.RemoveAttribute(kExport);
+            end;
+            for DFNType in kDFNTypes do
+               if (Element.HasAttribute(DFnType)) then
+               begin
+                  Element.SetAttribute(kDataDFNType, DFNType);
+                  Element.RemoveAttribute(DFnType);
+               end;
             CrossReferenceName := GetTopicIdentifier(Element);
             if (Assigned(InDFN)) then
                Fail('Nested <dfn>: ' + Describe(Element));
