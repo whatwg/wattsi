@@ -1093,6 +1093,8 @@ var
       SourceGitBaseURL: AnsiString = 'https://github.com/whatwg/html/commit/';
       kExport = 'export';
       kDataExport = 'data-export';
+      kNoExport = 'noexport';
+      kDataNoExport = 'data-noexport';
       kFor = 'for';
       kDataDFNFor = 'data-dfn-for';
       kDataDFNType = 'data-dfn-type';
@@ -1423,6 +1425,11 @@ var
             begin
                Element.SetAttribute(kDataExport, '');
                Element.RemoveAttribute(kExport);
+            end;
+            if (Element.HasAttribute(kNoExport)) then
+            begin
+               Element.SetAttribute(kDataNoExport, '');
+               Element.RemoveAttribute(kNoExport);
             end;
             for DFNType in kDFNTypes do
                if (Element.HasAttribute(DFnType)) then
