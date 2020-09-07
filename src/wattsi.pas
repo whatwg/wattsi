@@ -1098,14 +1098,48 @@ var
       kFor = 'for';
       kDataDFNFor = 'data-dfn-for';
       kDataDFNType = 'data-dfn-type';
-      // NOTE: The following array has the subset of dfn types we actually use
-      // in HTML currently. The full set of ~40 supported dfn types is at
-      // https://github.com/tabatkins/bikeshed/blob/master/bikeshed/config/dfnTypes.py#L7
-      // So if we ever start using any types other than the following in HTML,
-      // then at that time we will also need to update this array.
-      kDFNTypes: array[1..9] of UTF8String =
-         ('element', 'element-attr', 'event', 'interface', 'extended-attribute',
-          'method', 'attribute', 'enum-value', 'http-header');
+      // From https://github.com/tabatkins/bikeshed/blob/master/bikeshed/config/dfnTypes.py#L7
+      kDFNTypes: array[1..40] of UTF8String =
+         ('abstract-op',
+          'property',
+          'value',
+          'at-rule',
+          'descriptor',
+          'type',
+          'function',
+          'selector',
+          'element',
+          'element-attr',
+          'attr-value',
+          'element-state',
+          'event',
+          'interface',
+          'namespace',
+          'extended-attribute',
+          'constructor',
+          'method',
+          'argument',
+          'attribute',
+          'callback',
+          'dictionary',
+          'dict-member',
+          'enum',
+          'enum-value',
+          'exception',
+          'const',
+          'typedef',
+          'stringifier',
+          'serializer',
+          'iterator',
+          'maplike',
+          'setlike',
+          'grammar',
+          'scheme',
+          'state',
+          'mode',
+          'context',
+          'facet',
+          'http-header');
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
