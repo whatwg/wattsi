@@ -1437,6 +1437,12 @@ var
                   Element.SetAttribute(kDataDFNType, DFNType);
                   Element.RemoveAttribute(DFnType);
                end;
+            if (Element.HasAttribute(kDataDFNType)
+               and Element.HasAttribute(kDataExport)) then
+            begin
+               Fail('<dfn> found with dfn type name and redundant'
+                  + ' export attribute; dfn is ' + Describe(Element));
+            end;
             CrossReferenceName := GetTopicIdentifier(Element);
             if (Assigned(InDFN)) then
                Fail('Nested <dfn>: ' + Describe(Element));
