@@ -1099,7 +1099,8 @@ var
       kDataDFNFor = 'data-dfn-for';
       kDataDFNType = 'data-dfn-type';
       // From https://github.com/tabatkins/bikeshed/blob/master/bikeshed/config/dfnTypes.py#L7
-      kDFNTypes: array[1..40] of UTF8String =
+      // Plus the default "dfn" type (which we use on headings)
+      kDFNTypes: array[1..41] of UTF8String =
          ('abstract-op',
           'property',
           'value',
@@ -1139,7 +1140,8 @@ var
           'mode',
           'context',
           'facet',
-          'http-header');
+          'http-header',
+          'dfn');
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
@@ -1154,6 +1156,47 @@ var
       ID, HeadingText, ParentHeadingText, SectionNumber, ParentSectionNumber: UTF8String;
       ClassValue: String = '';
       DFNType: UTF8String = '';
+
+   procedure TranslateBikeshedSyntax(const Node: TElement);
+   begin
+      if (Element.HasAttribute(kLTAttribute)) then
+         Fail('Element with lt="" found, use data-x="" instead; dfn is ' + Describe(Element));
+      if (Element.HasAttribute(kFor)) then
+      begin
+         ExtractedData := Element.GetAttribute(kFor);
+         Element.SetAttributeDestructively(kDataDFNFor, ExtractedData);
+         Element.RemoveAttribute(kFor);
+      end;
+      if (Element.HasAttribute(kExport)) then
+      begin
+         Element.SetAttribute(kDataExport, '');
+         Element.RemoveAttribute(kExport);
+      end;
+      if (Element.HasAttribute(kNoExport)) then
+      begin
+         Element.SetAttribute(kDataNoExport, '');
+         Element.RemoveAttribute(kNoExport);
+      end;
+      for DFNType in kDFNTypes do
+         if (Element.HasAttribute(DFNType)) then
+         begin
+            if ((DFNType = 'dfn') and
+               Element.IsIdentity(nsHTML, eDFN)) then
+            begin
+               Fail('<dfn> element found with redundant dfn="" '
+                  + 'attribute; dfn is ' + Describe(Element));
+            end;
+            Element.SetAttribute(kDataDFNType, DFNType);
+            Element.RemoveAttribute(DFNType);
+         end;
+      if (Element.HasAttribute(kDataDFNType)
+         and Element.HasAttribute(kDataExport)) then
+      begin
+         Fail('Element found with dfn type name and redundant'
+            + ' export attribute; dfn is ' + Describe(Element));
+      end;
+   end;
+
    begin
       Result := True;
       if (Node is TElement) then
@@ -1168,6 +1211,7 @@ var
          else
          if (Element.HasProperties(propHeading)) then
          begin
+            TranslateBikeshedSyntax(Element);
             ClassName := Element.GetAttribute('class').AsString;
             CurrentHeadingRank := (Element as THTMLHeadingElement).Rank;
             if (CurrentHeadingRank > 1) then
@@ -1447,30 +1491,7 @@ var
          else
          if (Element.IsIdentity(nsHTML, eDFN)) then
          begin
-            if (Element.HasAttribute(kLTAttribute)) then
-               Fail('<dfn> with lt="" found, use data-x="" instead; dfn is ' + Describe(Element));
-            if (Element.HasAttribute(kFor)) then
-            begin
-               ExtractedData := Element.GetAttribute(kFor);
-               Element.SetAttributeDestructively(kDataDFNFor, ExtractedData);
-               Element.RemoveAttribute(kFor);
-            end;
-            if (Element.HasAttribute(kExport)) then
-            begin
-               Element.SetAttribute(kDataExport, '');
-               Element.RemoveAttribute(kExport);
-            end;
-            if (Element.HasAttribute(kNoExport)) then
-            begin
-               Element.SetAttribute(kDataNoExport, '');
-               Element.RemoveAttribute(kNoExport);
-            end;
-            for DFNType in kDFNTypes do
-               if (Element.HasAttribute(DFnType)) then
-               begin
-                  Element.SetAttribute(kDataDFNType, DFNType);
-                  Element.RemoveAttribute(DFnType);
-               end;
+            TranslateBikeshedSyntax(Element);
             CrossReferenceName := GetTopicIdentifier(Element);
             if (Assigned(InDFN)) then
                Fail('Nested <dfn>: ' + Describe(Element));
