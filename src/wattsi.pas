@@ -1158,7 +1158,7 @@ var
    procedure TranslateBikeshedSyntax(const Node: TElement);
    begin
       if (Element.HasAttribute(kLTAttribute)) then
-         Fail('<dfn> with lt="" found, use data-x="" instead; dfn is ' + Describe(Element));
+         Fail('Element with lt="" found, use data-x="" instead; dfn is ' + Describe(Element));
       if (Element.HasAttribute(kFor)) then
       begin
          ExtractedData := Element.GetAttribute(kFor);
@@ -1184,7 +1184,7 @@ var
       if (Element.HasAttribute(kDataDFNType)
          and Element.HasAttribute(kDataExport)) then
       begin
-         Fail('<dfn> found with dfn type name and redundant'
+         Fail('Element found with dfn type name and redundant'
             + ' export attribute; dfn is ' + Describe(Element));
       end;
    end;
