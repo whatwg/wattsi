@@ -1099,7 +1099,8 @@ var
       kDataDFNFor = 'data-dfn-for';
       kDataDFNType = 'data-dfn-type';
       // From https://github.com/tabatkins/bikeshed/blob/master/bikeshed/config/dfnTypes.py#L7
-      kDFNTypes: array[1..40] of UTF8String =
+      // Plus the default "dfn" type (which we use on headings)
+      kDFNTypes: array[1..41] of UTF8String =
          ('abstract-op',
           'property',
           'value',
@@ -1139,7 +1140,8 @@ var
           'mode',
           'context',
           'facet',
-          'http-header');
+          'http-header',
+          'dfn');
    var
       CandidateChild, SelectedForTransfer: TNode;
       CurrentHeadingRank: THeadingRank;
@@ -1176,10 +1178,16 @@ var
          Element.RemoveAttribute(kNoExport);
       end;
       for DFNType in kDFNTypes do
-         if (Element.HasAttribute(DFnType)) then
+         if (Element.HasAttribute(DFNType)) then
          begin
+            if ((DFNType = 'dfn') and
+               Element.IsIdentity(nsHTML, eDFN)) then
+            begin
+               Fail('<dfn> element found with redundant dfn="" '
+                  + 'attribute; dfn is ' + Describe(Element));
+            end;
             Element.SetAttribute(kDataDFNType, DFNType);
-            Element.RemoveAttribute(DFnType);
+            Element.RemoveAttribute(DFNType);
          end;
       if (Element.HasAttribute(kDataDFNType)
          and Element.HasAttribute(kDataExport)) then
