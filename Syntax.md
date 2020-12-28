@@ -184,7 +184,7 @@ The most important of these for day-to-day work is **w-nodev**, which is used to
 
 Wattsi has several of macros used to insert common text fragments. They will act on exact, case-sensitive matches for the following HTML comment strings:
 
-* `<!-- NON-NORMATIVE SECTION -->` inserts a "This section is non-normative." notice. ([Example](https://html.spec.whatwg.org/multipage/introduction.html#suggested-reading))
+* `<!-- NON-NORMATIVE SECTION -->` inserts a "本节是非规范的。" notice. ([Example](https://html.spec.whatwg.org/multipage/introduction.html#suggested-reading))
 * `<!--INSERT FINGERPRINT-->` inserts a fingerprint image to indicate a feature that may cause fingerprinting. (See the "[Privacy concerns](https://html.spec.whatwg.org/multipage/introduction.html#fingerprint)" section)
 * `<!--smalltoc-->` inserts a table of contents limited to top-level headings
 * `<!--toc-->` inserts a complete table of contents

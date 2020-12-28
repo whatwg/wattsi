@@ -88,10 +88,10 @@ const
    kSplitFilenameTargetAttribute = 'split-filename-target';
    kLTAttribute = 'lt';
    kHrefAttribute = 'href';
-   kNonNormative = 'This section is non-normative.';
-   Months: array[1..12] of UTF8String = ('January', 'February', 'March', 'April',
-                                         'May', 'June', 'July', 'August', 'September',
-                                         'October', 'November', 'December');
+   kNonNormative = '本节是非规范的。';
+   Months: array[1..12] of UTF8String = ('一月', '二月', '三月', '四月',
+                                         '五月', '六月', '七月', '八月', '九月',
+                                         '十月', '十一月', '十二月');
 
 type
    TElementMap = specialize THashTable <UTF8String, TElement, UTF8StringUtils>;
