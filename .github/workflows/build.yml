@@ -11,7 +11,7 @@ jobs:
     name: Build
     runs-on: ubuntu-20.04
     env:
-      IMAGE_NAME: whatwg/wattsi
+      IMAGE_NAME: imhele/wattsi
     steps:
     - uses: actions/checkout@v2
       with:

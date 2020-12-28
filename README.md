@@ -1,6 +1,6 @@
 # Wattsi
 
-Wattsi is a build tool for creating the [HTML Standard](https://html.spec.whatwg.org/multipage/) from its [source](https://github.com/whatwg/html). It works in concert with [other scripts](https://github.com/whatwg/html-build).
+Wattsi is a build tool for creating the [HTML Standard](https://html.spec.whatwg.org/multipage/) from its [source](https://github.com/imhele/html). It works in concert with [other scripts](https://github.com/imhele/html-build).
 
 ## Features
 
@@ -23,15 +23,15 @@ For documentation on the "Wattsi language", e.g. things like `data-x` or `w-node
 
 ## Building and running Wattsi with Docker
 
-The easiest way to use Wattsi is via [Docker](https://www.docker.com/). Once you have Docker, you can download and run a copy of Wattsi from [Docker Hub](https://hub.docker.com/r/whatwg/wattsi) using
+The easiest way to use Wattsi is via [Docker](https://www.docker.com/). Once you have Docker, you can download and run a copy of Wattsi from [Docker Hub](https://hub.docker.com/r/imhele/wattsi) using
 
 ```bash
-docker run whatwg/wattsi
+docker run imhele/wattsi
 ```
 
-The [HTML build tools](https://github.com/whatwg/html-build) will automatically attempt to use this form if they cannot find a locally-installed copy of Wattsi.
+The [HTML build tools](https://github.com/imhele/html-build) will automatically attempt to use this form if they cannot find a locally-installed copy of Wattsi.
 
-If you're developing Wattsi, you can build and test it in Docker with the command `make docker` and `docker run whatwg/wattsi`. The latter accepts any Wattsi arguments, e.g. `docker run whatwg/wattsi --version`.
+If you're developing Wattsi, you can build and test it in Docker with the command `make docker` and `docker run imhele/wattsi`. The latter accepts any Wattsi arguments, e.g. `docker run imhele/wattsi --version`.
 
 ## Building and running Wattsi manually
 
