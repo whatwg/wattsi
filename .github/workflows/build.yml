@@ -22,7 +22,7 @@ jobs:
     - name: docker run (get version)
       run: |
         WATTSI_VERSION=$(docker run "$IMAGE_NAME" --version | cut -d' ' -f2)
-        echo "::set-env name=WATTSI_VERSION::$WATTSI_VERSION"
+        echo "WATTSI_VERSION=$WATTSI_VERSION" >> $GITHUB_ENV
     - name: docker tag
       run: |
         docker tag "$IMAGE_NAME" "$IMAGE_NAME:$WATTSI_VERSION"
