@@ -58,7 +58,7 @@ apt install fp-compiler fp-units-fcl fp-units-net libc6-dev
 On macOS, install [Homebrew](https://brew.sh/) and the homebrew fpc 3.0.4 *revision 1* (3.0.4_1) or later package. The *revision 1* there is important — the initial 3.0.4 package will not work as expected on macOS Mojave (10.14) or later.
 
 ```bash
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 brew install fpc
 ```
 
