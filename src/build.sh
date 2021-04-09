@@ -26,4 +26,8 @@ else
   exit 1
 fi
 
+if which xcrun > /dev/null 2>&1; then
+  DEFINES="${DEFINES} -XR$(xcrun --show-sdk-path)"
+fi
+
 . ${SRC}lib/compile.sh
