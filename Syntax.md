@@ -45,7 +45,7 @@ definitions</span> to be...</p>
 However, canonical definition strings are case-insensitive, so at least you don't have to worry about initial capitalization:
 
 ```html
-<p><span>Custom element definitions</span> are awesome.</p>
+<p><span>Custom element definition</span> is a neat concept.</p>
 ```
 
 If you need to use a `<span>` or `<code>` element without it being a cross-reference, then you can use an empty `data-x=""` attribute:
