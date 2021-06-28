@@ -79,6 +79,7 @@ const
    kSuffixes: array[TVariants] of UTF8String = ('html', 'dev', 'snap', 'review');
    kExcludingAttribute: array[TAllVariants] of UTF8String = ('w-nohtml', 'w-nodev', 'w-nosnap', 'w-noreview', 'w-nosplit');
    kDEVAttribute = 'w-dev';
+   kNoOutputAttribute = 'w-nooutput';
    kCrossRefAttribute = 'data-x';
    kCrossSpecRefAttribute = 'data-x-href';
    kCrossRefInternalLinkAttribute = 'data-x-internal';
@@ -2411,6 +2412,8 @@ Result := False;
          exit;
       if (Element.LocalName.AsString = 'wpt') then
          exit;
+      if (Element.HasAttribute(kNoOutputAttribute)) then
+         exit;
       if (InSplit and Element.HasAttribute(kExcludingAttribute[vSplit])) then
          exit;
       IsExcluder := DetermineIsExcluder(Element, AttributeCount);
@@ -2499,6 +2502,11 @@ begin
       if (Current is TElement) then
       begin
          Element := TElement(Current);
+         if (Element.HasAttribute(kNoOutputAttribute)) then
+         begin
+            WalkToNextSkippingChildren(Current, Document, @WalkOut);
+            continue;
+         end;
          if (Element.LocalName.AsString = 'wpt') then
          begin
             InsertWPTTestsBlock(Element);
