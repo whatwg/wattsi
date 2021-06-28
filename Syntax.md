@@ -57,33 +57,22 @@ asynchronously:</p>
 
 ### Cross-specification cross references
 
-Wattsi does not support any database of definitions across all specifications in the ecosystem (like Bikeshed does). To work around this, the HTML Standard has a <a href="https://html.spec.whatwg.org/multipage/infrastructure.html#dependencies">Dependencies</a> section where we create "proxy" definitions.
+Wattsi does not support any database of definitions across all specifications in the ecosystem (like Bikeshed does). To work around this, we have a section in the source which contains "proxy" definitions.
+
+This section is near the top of the source, in an element marked with the `w-nooutput` attribute, so that its contents do not make their way into the final spec, but are still parsed and processed to assemble the cross-reference database.
 
 These proxy definitions use a new attribute, `data-x-href=""`, which indicates the external URL where the definition was originally located. For example:
 
 ```html
-<p>The following terms are defined in the WHATWG Infra standard: <ref spec=INFRA></p>
-
-<ul class="brief">
- <li>The general iteration terms <dfn data-x-href="https://infra.spec.whatwg.org/#iteration-while">while</dfn>,
-         <dfn data-x-href="https://infra.spec.whatwg.org/#iteration-continue">continue</dfn>, and
-         <dfn data-x-href="https://infra.spec.whatwg.org/#iteration-break">break</dfn>.</li>
- <li><dfn data-x-href="https://infra.spec.whatwg.org/#code-point">code point</dfn> and its synonym
-     <dfn data-x-href="https://infra.spec.whatwg.org/#code-point">character</dfn></li>
- <li><dfn data-x-href="https://infra.spec.whatwg.org/#surrogate">surrogate</dfn></li>
- <li><dfn data-x-href="https://infra.spec.whatwg.org/#scalar-value">scalar value</dfn></li>
- <li><dfn data-x-href="https://infra.spec.whatwg.org/#noncharacter">noncharacter</dfn></li>
- ...
-</ul>
+<dfn data-x-href="https://infra.spec.whatwg.org/#code-point">code point</dfn>
+<dfn data-x-href="https://infra.spec.whatwg.org/#list">list</dfn>
 ```
 
-Note how the above examples all use the default canonical definition text for the `<dfn>`. Sometimes we want to use a variant, as in the following example where the term is too common to be used by itself:
+Note that we might not use the same name as the defining spec for a term, as in the following example where the original term is too common to be used by itself:
 
 ```html
-<li>The <dfn data-x-href="https://infra.spec.whatwg.org/#list">list</dfn> data structure and the associated definitions for
-        <dfn data-x="list append" data-x-href="https://infra.spec.whatwg.org/#list-append">append</dfn>,
-        <dfn data-x="list replace" data-x-href="https://infra.spec.whatwg.org/#list-remove">replace</dfn>,
-        ...</li>
+<dfn data-x-href="https://infra.spec.whatwg.org/#list-append">list append</dfn>
+<dfn data-x-href="https://infra.spec.whatwg.org/#list-remove">list replace</dfn>
 ```
 
 We can then use these "proxy definitions" as normal:
@@ -179,6 +168,10 @@ To selectively include or omit content from these variants, you can use the foll
 </dl>
 
 The most important of these for day-to-day work is **w-nodev**, which is used to exclude content (such as details only interesting to web browser implementers) from the developer's edition.
+
+## Hiding from the output
+
+The **w-nooutput** attribute will hide the result from all formats. However, its contents will still be processed. This is used for the cross-specification dependencies section.
 
 ## Macros
 
