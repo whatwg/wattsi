@@ -548,7 +548,11 @@ type
    // xref anchors in order, for those instead of THashTable (which doesn't
    // preserve order), we use TFPGMap & TStringList (which both preserve order).
    TXrefAnchorsBySectionName = specialize TFPGMap <UTF8String, TStringList>;
-   TXrefsByDFNAnchor = specialize THashTable <UTF8String, TXrefAnchorsBySectionName, UTF8StringUtils>;
+   TXref = record
+      AnchorsBySectionName: TXrefAnchorsBySectionName;
+      CrossSpecURL: UTF8String;
+   end;
+   TXrefsByDFNAnchor = specialize THashTable <UTF8String, TXref, UTF8StringUtils>;
 
 var
    IDs: TElementMap; // The keys in these hashtables must outlive the DOM, since the DOM points to those strings
@@ -565,7 +569,7 @@ var
    XrefsByDFNAnchor: TXrefsByDFNAnchor;
    HeadingTextBySectionNumber: TStringMap;
 
-   function NewXrefsByDFNAnchor(SectionName: UTF8String; Anchor: UTF8String): TXrefAnchorsBySectionName;
+   function NewXrefsByDFNAnchor(SectionName: UTF8String; Anchor: UTF8String): TXref;
    var
       Anchors: TStringList;
       XrefAnchorsBySectionName: TXrefAnchorsBySectionName;
@@ -574,7 +578,17 @@ var
       Anchors.Add(Anchor);
       XrefAnchorsBySectionName := TXrefAnchorsBySectionName.Create;
       XrefAnchorsBySectionName.Add(SectionName, Anchors);
-      Result := XrefAnchorsBySectionName;
+      Result.AnchorsBySectionName := XrefAnchorsBySectionName;
+      Result.CrossSpecURL := '';
+   end;
+
+   function NewXRefByCrossSpecURL(CrossSpecURL: UTF8String): TXref;
+   var
+      XrefAnchorsBySectionName: TXrefAnchorsBySectionName;
+   begin
+      XrefAnchorsBySectionName := TXrefAnchorsBySectionName.Create;
+      Result.AnchorsBySectionName := XrefAnchorsBySectionName;
+      Result.CrossSpecURL := CrossSpecURL;
    end;
 
    function NewXrefAnchorsBySectionName(SectionName: UTF8String; Anchor: UTF8String): TXrefAnchorsBySectionName;
@@ -591,7 +605,7 @@ var
 
    procedure XrefsToJSON(XrefsByDFNAnchor: TXrefsByDFNAnchor);
    var
-      DFNAnchor, SectionName, Anchor: UTF8String;
+      DFNAnchor, SectionName, Anchor, CrossSpecURL: UTF8String;
       IsFirstDFN, IsFirstSectionName, IsFirstAnchor: boolean;
       Xrefs: Rope;
       XrefsFile: Text;
@@ -608,18 +622,26 @@ var
             Xrefs.Append('"');
             Xrefs.Append(@DFNAnchor);
             Xrefs.Append('":{');
+            if (Length(XrefsByDFNAnchor[DFNAnchor].CrossSpecURL) > 0) then
+            begin
+               CrossSpecURL := XrefsByDFNAnchor[DFNAnchor].CrossSpecURL;
+               Xrefs.Append('"url":"');
+               Xrefs.Append(@CrossSpecURL);
+               Xrefs.Append('",');
+            end;
+            Xrefs.Append('"refs":{');
             IsFirstSectionName := True;
-            for i := 0 to XrefsByDFNAnchor[DFNAnchor].Count - 1 do
+            for i := 0 to XrefsByDFNAnchor[DFNAnchor].AnchorsBySectionName.Count - 1 do
             begin
                if (not IsFirstSectionName) then
                   Xrefs.Append(',');
                IsFirstSectionName := False;
                Xrefs.Append('"');
-               SectionName := XrefsByDFNAnchor[DFNAnchor].Keys[i];
+               SectionName := XrefsByDFNAnchor[DFNAnchor].AnchorsBySectionName.Keys[i];
                Xrefs.Append(@SectionName);
                Xrefs.Append('":[');
                IsFirstAnchor := True;
-               for Anchor in XrefsByDFNAnchor[DFNAnchor][SectionName] do
+               for Anchor in XrefsByDFNAnchor[DFNAnchor].AnchorsBySectionName[SectionName] do
                begin
                   if (not IsFirstAnchor) then
                      Xrefs.Append(',');
@@ -630,7 +652,7 @@ var
                end;
                Xrefs.Append(']');
             end;
-            Xrefs.Append('}');
+            Xrefs.Append('}}');
          end;
       Xrefs.Append('}');
       Assign(XrefsFile, OutputDirectory + '/xrefs.json');
@@ -1518,8 +1540,17 @@ var
                   if (Element.HasAttribute(kCrossSpecRefAttribute)) then
                   begin
                      ExtractedData := Element.GetAttribute(kCrossSpecRefAttribute);
+                     if (not XrefsByDFNAnchor.Has(CrossReferenceName)) then
+                     begin
+                        XrefsByDFNAnchor.Add(CrossReferenceName, NewXRefByCrossSpecURL(ExtractedData.AsString));
+                     end
+                     else
+                     begin
+//                        XrefsByDFNAnchor[CrossReferenceName].CrossSpecURL := ExtractedData.AsString;
+                     end;
+
                      NewLink := ConstructHTMLElement(eA);
-                     NewLink.SetAttributeDestructively('href', ExtractedData);
+                     NewLink.SetAttribute('href', ExtractedData.AsString);
                      Element.SwapChildNodes(NewLink);
                      Element.AppendChild(NewLink);
                   end;
@@ -1811,16 +1842,15 @@ begin
                      SectionName := MungeForJsonOutput(CrossRefNode^.LastHeadingText);
                      Anchor := CrossRefNode^.SplitFilename.AsString + '.html#' + CrossRefNode^.Element.GetAttribute('id').AsString;
                      if (not XrefsByDFNAnchor.Has(DFNAnchor)) then
-                     begin
                         XrefsByDFNAnchor.Add(DFNAnchor, NewXrefsByDFNAnchor(SectionName, Anchor));
-                     end;
-                     if (XrefsByDFNAnchor[DFNAnchor].IndexOf(SectionName) = -1) then
+
+                     if (XrefsByDFNAnchor[DFNAnchor].AnchorsBySectionName.IndexOf(SectionName) = -1) then
                      begin
-                        XrefsByDFNAnchor[DFNAnchor].Add(SectionName, NewAnchorSet(Anchor));
+                        XrefsByDFNAnchor[DFNAnchor].AnchorsBySectionName.Add(SectionName, NewAnchorSet(Anchor));
                      end
                      else
-                       if (XrefsByDFNAnchor[DFNAnchor][SectionName].IndexOf(Anchor) = -1) then
-                          XrefsByDFNAnchor[DFNAnchor][SectionName].Add(Anchor);
+                       if (XrefsByDFNAnchor[DFNAnchor].AnchorsBySectionName[SectionName].IndexOf(Anchor) = -1) then
+                          XrefsByDFNAnchor[DFNAnchor].AnchorsBySectionName[SectionName].Add(Anchor);
                   end;
                   if (CrossRefNode^.Element.IsIdentity(nsHTML, eSpan)) then
                   begin
