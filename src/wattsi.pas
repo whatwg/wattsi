@@ -1196,6 +1196,11 @@ var
          Fail('Element found with dfn type name and redundant'
             + ' export attribute; dfn is ' + Describe(Element));
       end;
+      if ((not Element.HasAttribute(kDataDFNType))
+         and (not Element.HasProperties(propHeading))) then
+      begin
+          Element.SetAttribute(kDataDFNType, 'dfn');
+      end;
    end;
 
    begin
