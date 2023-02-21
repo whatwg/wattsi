@@ -1149,7 +1149,7 @@ var
       Element, HeadingSelfLink, NewLI, SecondLI, NewLink, NewP, NewI, NewSpan, TempElement: TElement;
       Scratch: Rope;
       ExtractedData: CutRope;
-      ClassName, Instruction, CrossReferenceName, ReferenceName: UTF8String;
+      ClassName, Instruction, CrossReferenceName, ReferenceName, DataDFNType: UTF8String;
       TodayYear, TodayMonth, TodayDay: Word;
       InSkippedNode, UsedLI: Boolean;
       ListNode: PElementListNode;
@@ -1193,8 +1193,12 @@ var
       if (Element.HasAttribute(kDataDFNType)
          and Element.HasAttribute(kDataExport)) then
       begin
-         Fail('Element found with dfn type name and redundant'
-            + ' export attribute; dfn is ' + Describe(Element));
+         DataDFNType := Element.GetAttribute(kDataDFNType).AsString;
+         if (DataDFNType <> 'dfn') then
+         begin
+            Fail('Element found with dfn type name and redundant'
+               + ' export attribute; dfn is ' + Describe(Element));
+         end;
       end;
    end;
 
