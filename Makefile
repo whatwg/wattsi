@@ -8,8 +8,7 @@ clean:
 
 docker:
 	git rev-list --count HEAD > src/version.inc
-	docker pull whatwg/wattsi || true
-	docker build --pull --cache-from whatwg/wattsi --tag whatwg/wattsi .
+	docker build --tag whatwg/wattsi .
 
 manual:
 	git rev-list --count HEAD > src/version.inc
