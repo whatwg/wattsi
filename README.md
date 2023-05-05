@@ -5,17 +5,18 @@ Wattsi is a build tool for creating the [HTML Standard](https://html.spec.whatwg
 ## Features
 
 Currently:
- * Number the sections
- * Create Table of Contents
- * Cross-reference `<span>` and `<code>` to `<dfn>`
- * Create small TOC
- * Cross-reference back (`<dfn>` menu)
- * Strip out unused references
- * Check for missing references
- * Spec splitting
- * Add output for `<wpt>` elements
- * Add MDN annotations
- * Add syntax-highlighting markup to `<pre>` contents
+
+* Number the sections
+* Create Table of Contents
+* Cross-reference `<span>` and `<code>` to `<dfn>`
+* Create small TOC
+* Cross-reference back (`<dfn>` menu)
+* Strip out unused references
+* Check for missing references
+* Spec splitting
+* Add output for `<wpt>` elements
+* Add MDN annotations
+* Add syntax-highlighting markup to `<pre>` contents
 
 ## Wattsi syntax
 
@@ -23,10 +24,10 @@ For documentation on the "Wattsi language", e.g. things like `data-x` or `w-node
 
 ## Building and running Wattsi with Docker
 
-The easiest way to use Wattsi is via [Docker](https://www.docker.com/). Once you have Docker, you can download and run a copy of Wattsi from [Docker Hub](https://hub.docker.com/r/whatwg/wattsi) using
+The easiest way to use Wattsi is via [Docker](https://www.docker.com/). Once you have Docker, you can download and run a copy of Wattsi from the [GitHub Container Registry](https://github.com/whatwg/wattsi/pkgs/container/wattsi) using
 
 ```bash
-docker run whatwg/wattsi
+docker run ghcr.io/whatwg/wattsi
 ```
 
 The [HTML build tools](https://github.com/whatwg/html-build) will automatically attempt to use this form if they cannot find a locally-installed copy of Wattsi.

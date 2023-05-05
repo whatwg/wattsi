@@ -1,40 +1,53 @@
-name: Build
+name: Wattsi CI
 on:
   pull_request:
-    branches:
-    - main
+    branches: ['main']
   push:
-    branches:
-    - main
+    branches: ['main']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-22.04
-    env:
-      IMAGE_NAME: whatwg/wattsi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - name: docker build
-      run: make docker
-    # This also serves as a *very* minimal test of the executable.
-    - name: docker run (get version)
+    - name: Create version file
       run: |
-        WATTSI_VERSION=$(docker run "$IMAGE_NAME" --version | cut -d' ' -f2)
-        echo "WATTSI_VERSION=$WATTSI_VERSION" >> $GITHUB_ENV
-    - name: docker tag
-      run: |
-        docker tag "$IMAGE_NAME" "$IMAGE_NAME:$WATTSI_VERSION"
-        docker tag "$IMAGE_NAME" "$IMAGE_NAME:latest"
-    - name: docker login
-      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      uses: docker/login-action@v1
+        git rev-list --count HEAD > src/version.inc
+    - name: Build
+      uses: docker/build-push-action@v4
       with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
-    - name: docker push
-      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        context: .
+        load: true
+        tags: ${{ env.IMAGE_NAME }}:test
+    - name: Test
+      # This minimal test also saves the version for us to use as a tag.
       run: |
-        docker push "$IMAGE_NAME:$WATTSI_VERSION"
-        docker push "$IMAGE_NAME:latest"
+        WATTSI_VERSION=$(docker run "$IMAGE_NAME:test" --version | cut -d' ' -f2)
+        echo "WATTSI_VERSION=$WATTSI_VERSION" >> $GITHUB_ENV
+    - name: Login
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build and push
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.WATTSI_VERSION }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
