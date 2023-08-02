@@ -1579,8 +1579,7 @@ var
          else
          if (Element.IsIdentity(nsHTML, eRef)) then
          begin
-            ExtractedData := Element.GetAttribute('spec');
-            ReferenceName := ExtractedData.AsString;
+            ReferenceName := Element.TextContent.AsString;
             New(ListNode);
             ListNode^.Value := Element;
             ListNode^.Next := References[ReferenceName];
@@ -1589,12 +1588,11 @@ var
             NewLink := ConstructHTMLElement(eA);
             Scratch := Default(Rope);
             Scratch.Append('#refs');
-            Scratch.AppendDestructively(ExtractedData); // $R-
+            Scratch.Append(ReferenceName);
             NewLink.SetAttributeDestructively('href', Scratch);
-            ExtractedData := Element.GetAttribute('spec');
             Scratch := Default(Rope);
             Scratch.Append('[');
-            Scratch.AppendDestructively(ExtractedData); // $R-
+            Scratch.Append(ReferenceName);
             Scratch.Append(']');
             NewLink.AppendChild(TText.CreateDestructively(Scratch));
             (Node.ParentNode as TElement).ReplaceChild(NewLink, Node);
@@ -2961,7 +2959,6 @@ begin
    Source := ReadFile(SourceFile);
    try
       Parser := THTMLParser.Create();
-      Parser.RegisterProperietaryVoidElements([eRef]);
       try
          try
             Parser.SpoonFeed(Source.Start, Source.Length);

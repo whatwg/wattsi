@@ -121,11 +121,11 @@ To produce the familiar bracketed references to other specifications, e.g.
 
 > There are a number of dynamic selectors that can be used with HTML. This section defines when these selectors match HTML elements. [[SELECTORS]](https://html.spec.whatwg.org/#refsSELECTORS) [[CSSUI]](https://html.spec.whatwg.org/#refsCSSUI)
 
-you can use the `<ref>` void element:
+you can use the (nonstandard) `<ref>` element:
 
 ```html
 <p>There are a number of dynamic selectors that can be used with HTML. This section defines when
-these selectors match HTML elements. <ref spec=SELECTORS> <ref spec=CSSUI></p>
+these selectors match HTML elements. <ref>SELECTORS</ref> <ref>CSSUI</ref></p>
 ```
 
 These match against a bibliography, which is a manually-maintained and sorted `<dl>` at the end of the source file, identified by having the ID "`ref-list`". Its entries look like the following:
