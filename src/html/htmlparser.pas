@@ -219,7 +219,6 @@ type
      const
       Marker = nil;
      var
-      FProprietaryVoids: specialize PlasticArray <TCanonicalString, TCanonicalString>;
       FInputStream: TInputStream;
       {$IFDEF PARSEERROR} FOnParseError: TParseErrorHandler; {$ENDIF}
       FTokeniserState: TTokeniserState;
@@ -314,7 +313,6 @@ type
       procedure SpoonFeed(const Data: UTF8String); // call this any number of times until all characters have been provided
       {$ENDIF}
       procedure SpoonFeed(const Data: Pointer; const Length: QWord); // call this any number of times until all characters have been provided
-      procedure RegisterProperietaryVoidElements(const TagNames: array of TCanonicalString);
       function Parse(): TDocument; // then call this
       // XXX need a fragment parsing mode (if we support fragment parsing, set FFragmentParsingMode to true)
       {$IFDEF PARSEERROR} property OnParseError: TParseErrorHandler read FOnParseError write FOnParseError; {$ENDIF}
@@ -1136,15 +1134,6 @@ begin
    FInputStream.PushData(Data, Length);
 end;
 
-procedure THTMLParser.RegisterProperietaryVoidElements(const TagNames: array of TCanonicalString);
-var
-   Name: TCanonicalString;
-begin
-   {$IFOPT C+} Assert(not FInputStream.WasStarted); {$ENDIF}
-   for Name in TagNames do
-      FProprietaryVoids.Push(Name);
-end;
-
 function THTMLParser.Parse(): TDocument;
 var
    OldKind: TTokenKind;
@@ -1936,7 +1925,7 @@ type
          end;
          BogusComment();
       end;
-      
+
       procedure TryForCDATASection(); inline;
       begin
          // seen [
@@ -2125,7 +2114,7 @@ type
       CommentSize := 0;
       repeat
          case (FInputStream.CurrentCharacter.Value) of
-            $003E, kEOF: break; 
+            $003E, kEOF: break;
             $0000: Inc(CommentSize, FFFD.Length);
             else Inc(CommentSize, FInputStream.CurrentCharacterLength);
          end;
@@ -2562,7 +2551,7 @@ begin
                         {$IFDEF PARSEERROR} ParseError('unexpected U+0000 in attribute name'); {$ENDIF}
                         FCurrentToken.CurrentAttributeName.Append($FFFD);
                      end;
-                  $0022, $0027, $003C: 
+                  $0022, $0027, $003C:
                      begin
                         {$IFDEF PARSEERROR} ParseError('invalid character in attribute name'); {$ENDIF}
                         FCurrentToken.CurrentAttributeName.Append(FInputStream.CurrentCharacter);
@@ -5907,7 +5896,7 @@ begin
          if (Token.TagName = eBody) then
          begin
             {$IFDEF PARSEERROR} ParseError('unexpected body start tag'); {$ENDIF}
-            if ((FStackOfOpenElements.Length < 2) or 
+            if ((FStackOfOpenElements.Length < 2) or
                 (not FStackOfOpenElements[1].IsIdentity(nsHTML, eBody)) or
                 (StackOfOpenElementsHas(nsHTML, eTemplate))) then
                exit; // ignore the token
@@ -5930,7 +5919,7 @@ begin
          if (Token.TagName = eFrameset) then
          begin
             {$IFDEF PARSEERROR} ParseError('unexpected body frameset start tag'); {$ENDIF}
-            if ((FStackOfOpenElements.Length < 2) or 
+            if ((FStackOfOpenElements.Length < 2) or
                 (not FStackOfOpenElements[1].IsIdentity(nsHTML, eBody))) then
                exit; // ignore the token
             if (not FFramesetOkFlag) then
@@ -6298,11 +6287,6 @@ begin
             // any other start tag
             ReconstructTheActiveFormattingElements();
             InsertAnHTMLElementFor(Token);
-            if (FProprietaryVoids.Contains(Token.TagName)) then
-            begin
-               FStackOfOpenElements.Pop();
-               {$IFDEF PARSEERROR} Token.AcknowledgeSelfClosingFlag(); {$ENDIF}
-            end;
          end;
       tkEndTag:
          // in this section things are hoisted also
@@ -6381,7 +6365,7 @@ begin
          if ((Token.TagName = eDiv) or
              (Token.TagName = ePre) or
              (Token.TagName = eOL) or
-             (Token.TagName = eDL)) then 
+             (Token.TagName = eDL)) then
          begin
             if (not StackOfOpenElementsHasInScope(Token.TagName)) then
             begin
@@ -6467,7 +6451,7 @@ begin
              //(Token.TagName = ePre) or // hoisted
              (Token.TagName = eSection) or
              (Token.TagName = eSummary) or
-             (Token.TagName = eUL)) then 
+             (Token.TagName = eUL)) then
          begin
             if (not StackOfOpenElementsHasInScope(Token.TagName)) then
             begin
@@ -6815,7 +6799,7 @@ begin
             exit;
          end
          else
-         if ((Token.TagName = eBody) or 
+         if ((Token.TagName = eBody) or
              (Token.TagName = eCaption) or
              (Token.TagName = eCol) or
              (Token.TagName = eColGroup) or
@@ -7869,7 +7853,7 @@ begin
             end;
          end;
       tkExtraSpaceCharacter: InsertCharacters(Token.ExtraChars);
-      {$IFDEF PARSEERROR} tkExtraCharacters: ParseError('unexpected character token after frameset', Length(Token.ExtraChars)); {$ENDIF} // $R- 
+      {$IFDEF PARSEERROR} tkExtraCharacters: ParseError('unexpected character token after frameset', Length(Token.ExtraChars)); {$ENDIF} // $R-
       tkComment: InsertAComment(Token);
       {$IFDEF PARSEERROR} tkDOCTYPE: ParseError('unexpected DOCTYPE'); {$ENDIF}
       tkStartTag:
@@ -8131,49 +8115,49 @@ begin
       tkComment: InsertAComment(Token); // http://bugs.freepascal.org/view.php?id=26403
       {$IFDEF PARSEERROR} tkDOCTYPE: ParseError('unexpected DOCTYPE'); {$ENDIF}
       tkStartTag:
-         if ((Token.TagName = eB) or 
-             (Token.TagName = eBig) or 
-             (Token.TagName = eBlockQuote) or 
-             (Token.TagName = eBody) or 
-             (Token.TagName = eBr) or 
-             (Token.TagName = eCenter) or 
-             (Token.TagName = eCode) or 
-             (Token.TagName = eDD) or 
-             (Token.TagName = eDiv) or 
-             (Token.TagName = eDL) or 
-             (Token.TagName = eDT) or 
-             (Token.TagName = eEm) or 
-             (Token.TagName = eEmbed) or 
-             (Token.TagName = eH1) or 
-             (Token.TagName = eH2) or 
-             (Token.TagName = eH3) or 
-             (Token.TagName = eH4) or 
-             (Token.TagName = eH5) or 
-             (Token.TagName = eH6) or 
-             (Token.TagName = eHead) or 
-             (Token.TagName = eHR) or 
-             (Token.TagName = eI) or 
-             (Token.TagName = eImg) or 
-             (Token.TagName = eLI) or 
-             (Token.TagName = eListing) or 
-             (Token.TagName = eMenu) or 
-             (Token.TagName = eMeta) or 
-             (Token.TagName = eNoBr) or 
-             (Token.TagName = eOL) or 
-             (Token.TagName = eP) or 
-             (Token.TagName = ePre) or 
-             (Token.TagName = eRuby) or 
-             (Token.TagName = eS) or 
-             (Token.TagName = eSmall) or 
-             (Token.TagName = eSpan) or 
-             (Token.TagName = eStrong) or 
-             (Token.TagName = eStrike) or 
-             (Token.TagName = eSub) or 
-             (Token.TagName = eSup) or 
-             (Token.TagName = eTable) or 
-             (Token.TagName = eTT) or 
-             (Token.TagName = eU) or 
-             (Token.TagName = eUL) or 
+         if ((Token.TagName = eB) or
+             (Token.TagName = eBig) or
+             (Token.TagName = eBlockQuote) or
+             (Token.TagName = eBody) or
+             (Token.TagName = eBr) or
+             (Token.TagName = eCenter) or
+             (Token.TagName = eCode) or
+             (Token.TagName = eDD) or
+             (Token.TagName = eDiv) or
+             (Token.TagName = eDL) or
+             (Token.TagName = eDT) or
+             (Token.TagName = eEm) or
+             (Token.TagName = eEmbed) or
+             (Token.TagName = eH1) or
+             (Token.TagName = eH2) or
+             (Token.TagName = eH3) or
+             (Token.TagName = eH4) or
+             (Token.TagName = eH5) or
+             (Token.TagName = eH6) or
+             (Token.TagName = eHead) or
+             (Token.TagName = eHR) or
+             (Token.TagName = eI) or
+             (Token.TagName = eImg) or
+             (Token.TagName = eLI) or
+             (Token.TagName = eListing) or
+             (Token.TagName = eMenu) or
+             (Token.TagName = eMeta) or
+             (Token.TagName = eNoBr) or
+             (Token.TagName = eOL) or
+             (Token.TagName = eP) or
+             (Token.TagName = ePre) or
+             (Token.TagName = eRuby) or
+             (Token.TagName = eS) or
+             (Token.TagName = eSmall) or
+             (Token.TagName = eSpan) or
+             (Token.TagName = eStrong) or
+             (Token.TagName = eStrike) or
+             (Token.TagName = eSub) or
+             (Token.TagName = eSup) or
+             (Token.TagName = eTable) or
+             (Token.TagName = eTT) or
+             (Token.TagName = eU) or
+             (Token.TagName = eUL) or
              (Token.TagName = eVar) or
              ((Token.TagName = eFont) and (Token.HasAttributes(['color', 'face', 'size'])))) then
          begin
