@@ -1588,11 +1588,11 @@ var
             NewLink := ConstructHTMLElement(eA);
             Scratch := Default(Rope);
             Scratch.Append('#refs');
-            Scratch.Append(ReferenceName);
+            Scratch.Append(@ReferenceName);
             NewLink.SetAttributeDestructively('href', Scratch);
             Scratch := Default(Rope);
             Scratch.Append('[');
-            Scratch.Append(ReferenceName);
+            Scratch.Append(@ReferenceName);
             Scratch.Append(']');
             NewLink.AppendChild(TText.CreateDestructively(Scratch));
             (Node.ParentNode as TElement).ReplaceChild(NewLink, Node);
