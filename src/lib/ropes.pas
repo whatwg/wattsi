@@ -48,7 +48,7 @@ type
       TUTF8InlineIndexPlusOne = 0..UTF8InlineSize;
       TCodepointsIndex = 0..CodepointsSize-1;
       TCodepointsIndexPlusOne = 0..CodepointsSize;
-      TInlineString = String[UTF8InlineSize];
+      TInlineString = String[UTF8InlineSize + 1];
       PRopeFragment = ^TRopeFragment;
       TRopeFragment = record
          Next: PRopeFragment;
@@ -963,6 +963,12 @@ begin
    {$IFDEF VERBOSE} if (DebugNow) then Writeln('Ropes: Append(ShortString) on rope @', IntToHex(PtrUInt(@Self), 16), ' with data @', IntToHex(PtrUInt(FValue), 16)); {$ENDIF}
    {$IFDEF VERBOSE} if (DebugNow) then Writeln('Ropes:   Length(FValue)=', Length(FValue)); {$ENDIF}
    Assert(Length(NewString) <= RopeInternals.UTF8InlineSize, 'Maximum size of short string is ' + IntToStr(RopeInternals.UTF8InlineSize));
+   if (Length(NewString) > RopeInternals.UTF8InlineSize) then
+   begin
+      Writeln('Error: Append() call with string length > UTF8InlineSize: "' + NewString + '"');
+      Writeln('Call Append() with a string pointer, not a string: Append(@Foo), not Append(Foo)');
+      Halt(1);
+   end;
    if ((not Assigned(FLast)) or (FLast^.Kind <> rfUTF8Inline) or (RopeInternals.UTF8InlineSize - FLast^.InlineLength < Length(NewString))) then
    begin
       EnsureSize(1, 1);
