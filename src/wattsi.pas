@@ -1587,18 +1587,8 @@ var
             MissingReferences[ReferenceName] := ListNode;
 
             NewLink := ConstructHTMLElement(eA);
-            Scratch := Default(Rope);
-            ExtractedData := Element.TextContent.ExtractAll();
-            Scratch.Append('#refs');
-            Scratch.AppendDestructively(ExtractedData);
-            NewLink.SetAttributeDestructively('href', Scratch);
-
-            Scratch := Default(Rope);
-            ExtractedData := Element.TextContent.ExtractAll();
-            Scratch.Append('[');
-            Scratch.AppendDestructively(ExtractedData);
-            Scratch.Append(']');
-            NewLink.AppendChild(TText.CreateDestructively(Scratch));
+            NewLink.SetAttribute('href', '#refs' + ReferenceName);
+            NewLink.AppendChild(TText.Create('[' + ReferenceName + ']'));
 
             (Node.ParentNode as TElement).ReplaceChild(NewLink, Node);
             Node.Free();
