@@ -1489,8 +1489,10 @@ var
          // For vReview the title is already taken care of
          if (Element.IsIdentity(nsHTML, eTitle)) and (Variant = vSnap) then
          begin
+            Scratch := Default(Rope);
+            Scratch.Append(@SourceGitSHA);
             Element.AppendChild(TText.Create(' (Commit Snapshot '));
-            Element.AppendChild(TText.Create(SourceGitSHA));
+            Element.AppendChild(TText.CreateDestructively(Scratch));
             Element.AppendChild(TText.Create(')'));
          end
          else
@@ -1550,7 +1552,9 @@ var
          else
          if (Element.isIdentity(nsHTML, eA) and (Element.GetAttribute('class').AsString = 'sha-link') and (Variant = vSnap)) then
          begin
-            Element.AppendChild(TText.Create(SourceGitSHA));
+            Scratch := Default(Rope);
+            Scratch.Append(@SourceGitSHA);
+            Element.AppendChild(TText.CreateDestructively(Scratch));
             Element.AppendChild(TText.Create(' commit'));
             Scratch := Default(Rope);
             Scratch.Append(@SourceGitBaseURL);
