@@ -966,7 +966,7 @@ begin
    if (Length(NewString) > RopeInternals.UTF8InlineSize) then
    begin
       Writeln('Error: Append() call with string length > UTF8InlineSize: "' + NewString + '"');
-      Writeln('Call Append() with a string pointer, not a string: Append(@Foo), not Append(Foo)');
+      Writeln('Use Ropes instead; see https://github.com/whatwg/wattsi/#how-to-work-with-strings');
       Halt(1);
    end;
    if ((not Assigned(FLast)) or (FLast^.Kind <> rfUTF8Inline) or (RopeInternals.UTF8InlineSize - FLast^.InlineLength < Length(NewString))) then
