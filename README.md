@@ -78,3 +78,59 @@ If you already have XCode installed, you can ensure you have the latest XCode co
 ```bash
 xcode-select --install
 ```
+
+## Contributing
+
+When contributing code changes to Wattsi, it’s important to understand some particulars about the programming API the code exposes.
+
+### How to work with strings
+
+Many operations in the Wattsi code don’t take normal strings as input but instead (for performance reasons) take custom types of string buffers that are called Rope and CutRopes in the code (but that aren’t the same kind of Rope as what’s described at https://en.wikipedia.org/wiki/Rope_(data_structure)).
+
+The typical cases where you’d need to work with Ropes and CutRopes are when you’re getting text content from the document source, and when you’re setting the values of attributes and text nodes in the output.
+
+Here’s a commented example of setting an attribute value for an element:
+
+```pascal
+// Create a new <a> element and assign it to the NewLink variable.
+NewLink := ConstructHTMLElement(eA);
+// Create a new rope and assign it to the Scratch variable.
+Scratch := Default(Rope);
+// Get the text content of Element (which happens to be the current
+// element being processed) and assign it to the ExtractedData variable
+// (which happens to be a cutrope).
+ExtractedData := Element.TextContent.ExtractAll();
+// Append the literal string “#refs” to the Scratch rope.
+Scratch.Append('#refs');
+// Append the ExtractedData cutrope to the Scratch rope (“destructively”
+// means that the ExtractedData cutrope is destroyed after the Append).
+Scratch.AppendDestructively(ExtractedData);
+// Set the value of the NewLink <a> element’s href attribute to the
+// content of the Scratch rope (“destructively” means that the Scratch
+// rope is destroyed after the attribute value is set).
+NewLink.SetAttributeDestructively('href', Scratch);
+```
+
+And here’s a commented example of creating and appending a new text node:
+
+```pascal
+// Create a new <a> element and assign it to the NewLink variable.
+NewLink := ConstructHTMLElement(eA);
+// Create a new rope and assign it to the Scratch variable.
+Scratch := Default(Rope);
+// Get the text content of Element (which happens to be the current
+// element being processed) and assign it to the ExtractedData variable
+// (which happens to be a cutrope).
+ExtractedData := Element.TextContent.ExtractAll();
+// Append the literal string “[” to the Scratch rope.
+Scratch.Append('[');
+// Append the ExtractedData cutrope to the Scratch rope (“destructively”
+// means that the ExtractedData cutrope is destroyed after the Append).
+Scratch.AppendDestructively(ExtractedData);
+// Append the literal string “]” to the Scratch rope.
+Scratch.Append(']');
+// Create a new text node from the Scratch rope (“destructively” means
+// that the Scratch rope is destroyed after the text node is created),
+// and append it to the NewLink <a> element.
+NewLink.AppendChild(TText.CreateDestructively(Scratch));
+```
