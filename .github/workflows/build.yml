@@ -18,20 +18,14 @@ jobs:
       packages: write
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - name: Setup QEMU
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: linux/amd64,linux/arm64
-    - name: Setup Docker Buildx
-      uses: docker/setup-buildx-action@v3
     - name: Create version file
       run: |
         git rev-list --count HEAD > src/version.inc
     - name: Build
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v4
       with:
         context: .
         load: true
@@ -43,18 +37,17 @@ jobs:
         echo "WATTSI_VERSION=$WATTSI_VERSION" >> $GITHUB_ENV
     - name: Login
       if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      uses: docker/login-action@v3
+      uses: docker/login-action@v2
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Build and push
       if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v4
       with:
         context: .
         push: true
-        platforms: linux/amd64,linux/arm64
         tags: |
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.WATTSI_VERSION }}
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
