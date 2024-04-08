@@ -1704,7 +1704,7 @@ begin
    if (Value <> '') then
    begin
       {$IFOPT C+} AssertStringIsConstant(Value); {$ENDIF}
-      R.Append(@Value);
+      R.Append(Value);
    end;
    FAttributes[Name] := R;
 end;
@@ -1761,7 +1761,7 @@ begin
    if (NewData <> '') then
    begin
       {$IFOPT C+} AssertStringIsConstant(NewData); {$ENDIF}
-      FData.Append(@NewData);
+      FData.Append(NewData);
    end;
 end;
 
