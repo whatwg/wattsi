@@ -1692,6 +1692,7 @@ var
                                               'alt', '(This is a tracking vector.)',
                                               'width', '46',
                                               'height', '64',
+                                              'class', 'darkmode-aware',
                                               'crossorigin', ''])]);
             (Node.ParentNode as TElement).ReplaceChild(TempElement, Node);
             Node.Free();
