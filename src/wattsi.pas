@@ -2872,6 +2872,14 @@ begin
    SectionNames.Free();
 end;
 
+function PrintUsageAndHalt(): Boolean;
+begin;
+  Writeln('syntax:');
+  Writeln('  wattsi [--quiet] [--single-page-only] <source-file> <source-git-sha> <output-directory> <default-or-review> <mdn-spec-links/html.json> [<highlight-server-url>]');
+  Writeln('  wattsi --version');
+  Halt(1);
+end;
+
 function Main(): Boolean;
 const
    OtherVariants = [Low(TVariants)..High(TVariants)] - [Low(TVariants)];
@@ -2889,6 +2897,11 @@ var
    i: integer;
 begin
    Result := False;
+   if (ParamCount = 0) then
+   begin
+     Writeln('wattsi: missing required arguments');
+     PrintUsageAndHalt();
+   end;
    if ((ParamCount() = 1) and (ParamStr(1) = '--version')) then
    begin
       Writeln('wattsi ' + IntToStr(Version));
@@ -2912,10 +2925,7 @@ begin
          if ((ParamCount() - i) < 4) then
          begin
             Writeln('wattsi: invalid arguments');
-            Writeln('syntax:');
-            Writeln('  wattsi [--quiet] [--single-page-only] <source-file> <source-git-sha> <output-directory> <default-or-review> <mdn-spec-links/html.json> [<highlight-server-url>]');
-            Writeln('  wattsi --version');
-            exit;
+            PrintUsageAndHalt();
          end;
          SourceFile := ParamStr(i);
          SourceGitSHA := ParamStr(i + 1);
