@@ -41,7 +41,7 @@ type
     private
      const
       FragmentPayloadSize = SizeOf(TFixedSizeRopeFragment);
-      UTF8InlineSize = FragmentPayloadSize - SizeOf(Byte);
+      UTF8InlineSize = 30;
       CodepointsSize = (FragmentPayloadSize-SizeOf(Byte)) div SizeOf(TUnicodeCodepoint);
      type
       TUTF8InlineIndex = 0..UTF8InlineSize-1;
@@ -965,8 +965,7 @@ begin
    Assert(Length(NewString) <= RopeInternals.UTF8InlineSize, 'Maximum size of short string is ' + IntToStr(RopeInternals.UTF8InlineSize));
    if (Length(NewString) > RopeInternals.UTF8InlineSize) then
    begin
-      Writeln('Error: Append() call with string length > UTF8InlineSize: "' + NewString + '"');
-      Writeln('Call Append() with a string pointer, not a string: Append(@Foo), not Append(Foo)');
+      Writeln('Error: Operation attempted with string length > UTF8InlineSize: "' + NewString + '..."');
       Halt(1);
    end;
    if ((not Assigned(FLast)) or (FLast^.Kind <> rfUTF8Inline) or (RopeInternals.UTF8InlineSize - FLast^.InlineLength < Length(NewString))) then
