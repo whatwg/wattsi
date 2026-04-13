@@ -1150,6 +1150,7 @@ var
       ExtractedData: CutRope;
       ClassName, Instruction, CrossReferenceName, ReferenceName, DataDFNType: UTF8String;
       TodayYear, TodayMonth, TodayDay: Word;
+      EnvDate: string;  UseTimestamp: Int64;  DT: TDateTime;
       InSkippedNode, UsedLI: Boolean;
       ListNode: PElementListNode;
       DFNEntry: TDFNEntry;
@@ -1462,7 +1463,23 @@ var
                else
                begin
                   Scratch := Default(Rope);
-                  DecodeDate(Date, TodayYear, TodayMonth, TodayDay);
+                  EnvDate := GetEnvironmentVariable('HTML_PUBDATE');
+                  if EnvDate <> '' then
+                  begin
+                     if TryStrToInt64(EnvDate, UseTimestamp) then
+                     begin
+                        // Convert seconds-since-1970 to TDateTime
+                        DT := UnixToDateTime(UseTimestamp, False); // False = timestamp is UTC
+                     end
+                     else
+                     begin
+                        // fallback: keep original Date variable if parse fails
+                        DT := Date;
+                     end;
+                  end
+                  else
+                     DT := Date; // original variable
+                  DecodeDate(DT, TodayYear, TodayMonth, TodayDay);
                   if (ClassName = 'pubdate') then
                   begin
                      Scratch.Append(IntToStr(TodayDay));
