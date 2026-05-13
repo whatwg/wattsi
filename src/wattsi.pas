@@ -47,6 +47,7 @@ uses
 var
    Quiet: Boolean = false;
    SinglePageOnly: Boolean = false;
+   BikeshedPass: Integer = 0; // 0 = not bikeshed, 1 = pass 1, 2 = pass 2
    Version: Word = (*$I version.inc *); // unsigned integer from 0 .. 65535
    HighlightServerURL: AnsiString = '';
    OutputDirectory: AnsiString;
@@ -938,6 +939,13 @@ var
       CrossReferenceName := GetTopicIdentifier(Element);
       if (not CrossReferenceName.IsEmpty) then
       begin
+         if (BikeshedPass = 1) then
+         begin
+            if (Element.HasAttribute(kSubDFNAttribute)) then
+               Element.SetAttribute(kCrossRefAttribute, CrossReferenceName)
+            else
+               Element.SetAttribute('data-x-lt', CrossReferenceName);
+         end;
          DFNEntry := CrossReferences.DFNs[CrossReferenceName];
          if (Element.HasAttribute(kSubDFNAttribute)) then
          begin
@@ -1453,7 +1461,7 @@ var
          if (Element.IsIdentity(nsHTML, eSpan)) then
          begin
             ClassName := Element.GetAttribute('class').AsString;
-            if ((ClassName = 'pubdate') or (ClassName = 'pubyear')) then
+            if ((ClassName = 'pubdate') or (ClassName = 'pubyear') or (ClassName = 'secno')) then
             begin
                if ((not Element.HasChildNodes()) or (not (Element.FirstChild is TText))) then
                begin
@@ -1497,6 +1505,8 @@ var
          begin
             TranslateBikeshedSyntax(Element);
             CrossReferenceName := GetTopicIdentifier(Element);
+            if (BikeshedPass = 1) then
+               Element.SetAttribute(kCrossRefAttribute, CrossReferenceName);
             if (Assigned(InDFN)) then
                Fail('Nested <dfn>: ' + Describe(Element));
             InDFN := Element;
@@ -1835,12 +1845,16 @@ begin
                      if (CrossRefNode^.Element.HasAttribute('id')) then
                         IDs[CrossRefNode^.Element.GetAttribute('id').AsString] := NewLink;
                      CrossRefNode^.Element.SwapAttributes(NewLink);
+                     if (NewLink.HasAttribute(kCrossRefAttribute)) then
+                        NewLink.RemoveAttribute(kCrossRefAttribute);
                      (CrossRefNode^.Element.ParentNode as TElement).ReplaceChild(NewLink, CrossRefNode^.Element);
                      CrossRefNode^.Element.Free();
                   end
                   else
                   begin
                      CrossRefNode^.Element.AppendChild(NewLink);
+                     if (CrossRefNode^.Element.HasAttribute(kCrossRefAttribute)) then
+                        CrossRefNode^.Element.RemoveAttribute(kCrossRefAttribute);
                   end;
                   if (DFN.HasAttribute(kCrossSpecRefAttribute)) then
                   begin
@@ -2356,7 +2370,7 @@ Result := False;
                   if (AttributeName = kExcludingAttribute[Variant]) then
                      Skip := True;
                if (Skip or (AttributeName = kDEVAttribute) or
-                           (AttributeName = kCrossRefAttribute) or
+                           ((AttributeName = kCrossRefAttribute) and (BikeshedPass <> 1)) or
                            (AttributeName = kSubDFNAttribute) or
                            (AttributeName = kCrossSpecRefAttribute) or
                            (AttributeName = kUndefinedAttribute) or
@@ -2913,6 +2927,19 @@ begin
          continue;
       end
       else
+      if (ParamStr(i) = '--bikeshed') then
+      begin
+         if (BikeshedPass = 0) then
+            BikeshedPass := 1;
+         continue;
+      end
+      else
+      if (AnsiStartsStr('--pass=', ParamStr(i))) then
+      begin
+         BikeshedPass := StrToIntDef(Copy(ParamStr(i), 8, Length(ParamStr(i))), 0);
+         continue;
+      end
+      else
       begin
          if ((ParamCount() - i) < 4) then
          begin
@@ -2964,6 +2991,8 @@ begin
    eChapter := Intern('chapter');
    RegisterHTMLElement('ref', eRef, THTMLElement, 0);
    Inform('Parsing...');
+   if (BikeshedPass > 0) then
+      Inform('Bikeshed Pass: ' + IntToStr(BikeshedPass));
    {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
    Source := ReadFile(SourceFile);
    try
