@@ -53,6 +53,7 @@ var
    OutputDirectory: AnsiString;
    SearchIndexJsonFile: Text;
    IsFirstSearchIndexItem: Boolean = true;
+   KeptAliveStrings: TStringList;
 
 type
    TAllVariants = (vHTML, vDEV, vSnap, vReview, vSplit);
@@ -935,16 +936,20 @@ var
       DFNEntry: TDFNEntry;
       SectionNumber: Rope;
       CurrentHeadingRank: THeadingRank;
+      ScratchRope: Rope;
    begin
       CrossReferenceName := GetTopicIdentifier(Element);
       if (not CrossReferenceName.IsEmpty) then
       begin
          if (BikeshedPass = 1) then
          begin
+            ScratchRope := Default(Rope);
+            ScratchRope.Append(@CrossReferenceName);
             if (Element.HasAttribute(kSubDFNAttribute)) then
-               Element.SetAttribute(kCrossRefAttribute, CrossReferenceName)
+               Element.SetAttributeDestructively(kCrossRefAttribute, ScratchRope)
             else
-               Element.SetAttribute('data-x-lt', CrossReferenceName);
+               Element.SetAttributeDestructively('data-x-lt', ScratchRope);
+            KeptAliveStrings.Add(CrossReferenceName);
          end;
          DFNEntry := CrossReferences.DFNs[CrossReferenceName];
          if (Element.HasAttribute(kSubDFNAttribute)) then
@@ -1506,7 +1511,12 @@ var
             TranslateBikeshedSyntax(Element);
             CrossReferenceName := GetTopicIdentifier(Element);
             if (BikeshedPass = 1) then
-               Element.SetAttribute(kCrossRefAttribute, CrossReferenceName);
+            begin
+               Scratch := Default(Rope);
+               Scratch.Append(@CrossReferenceName);
+               Element.SetAttributeDestructively(kCrossRefAttribute, Scratch);
+               KeptAliveStrings.Add(CrossReferenceName);
+            end;
             if (Assigned(InDFN)) then
                Fail('Nested <dfn>: ' + Describe(Element));
             InDFN := Element;
@@ -2994,6 +3004,7 @@ begin
    if (BikeshedPass > 0) then
       Inform('Bikeshed Pass: ' + IntToStr(BikeshedPass));
    {$IFDEF TIMINGS} StartTime := Now(); {$ENDIF}
+   KeptAliveStrings := TStringList.Create;
    Source := ReadFile(SourceFile);
    try
       Parser := THTMLParser.Create();
@@ -3104,6 +3115,7 @@ begin
       end;
    finally
       Source.Destroy();
+      KeptAliveStrings.Free;
    end;
 end;
 
