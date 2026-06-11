@@ -1820,12 +1820,12 @@ begin
                   if (CrossRefNode^.Element.HasAttribute(kUndefinedAttribute)) then
                      Fail('Use of defined term "' + CrossRefNode^.Topic + '" marked as undefined: ' + Describe(CrossRefNode^.Element));
                   ID := EnsureID(DFN, MungeTopicToID(CrossRefNode^.Topic));
-                  EnsureID(CrossRefNode^.Element, CrossRefNode^.LastHeading + ':' + ID.AsString);
+                  DFNAnchor := ID.AsString;
+                  EnsureID(CrossRefNode^.Element, CrossRefNode^.LastHeading + ':' + DFNAnchor);
                   NewLink := ConstructHTMLElement(eA);
                   CrossRefNode^.Element.SwapChildNodes(NewLink);
                   if (Variant <> vDEV) then
                   begin
-                     DFNAnchor := ID.AsString;
                      SectionName := MungeForJsonOutput(CrossRefNode^.LastHeadingText);
                      Anchor := CrossRefNode^.SplitFilename.AsString + '.html#' + CrossRefNode^.Element.GetAttribute('id').AsString;
                      if (not XrefsByDFNAnchor.Has(DFNAnchor)) then
