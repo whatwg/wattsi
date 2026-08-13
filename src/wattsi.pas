@@ -44,6 +44,9 @@ uses
    plasticarrays, exceptions, unicode, ropes, wires, canonicalstrings,
    dom, webdom, htmlparser, json, fphttpclient;
 
+const
+   kHighlighterOptions = '%20--output%20html';
+
 var
    Quiet: Boolean = false;
    SinglePageOnly: Boolean = false;
@@ -2410,6 +2413,7 @@ Result := False;
       AttributeCount: Cardinal;
       URLEncodedJSONContents: String;
       HighlighterOutput: String;
+      HighlightLanguage: String;
       ClassValue: String = '';
       HTTPClient: TFPHTTPClient;
       Ss: TStringStream;
@@ -2444,19 +2448,24 @@ Result := False;
                      HTTPClient := TFPHTTPClient.Create(nil);
                      Ss := TStringStream.Create('');
                      if (AnsiContainsStr(ClassValue, 'idl')) then
-                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/webidl?' + URLEncodedJSONContents, Ss, [200,400])
+                        HighlightLanguage := 'webidl'
                      else
                      if (AnsiContainsStr(ClassValue, 'css')) then
-                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/css?' + URLEncodedJSONContents, Ss, [200,400])
+                        HighlightLanguage := 'css'
                      else
                      if (AnsiContainsStr(ClassValue, 'js')) then
-                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/js?' + URLEncodedJSONContents, Ss, [200,400])
+                        HighlightLanguage := 'js'
                      else
                      if (AnsiContainsStr(ClassValue, 'abnf')) then
-                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/abnf?' + URLEncodedJSONContents, Ss, [200,400])
+                        HighlightLanguage := 'abnf'
                      else
                      if (AnsiContainsStr(ClassValue, 'html')) then
-                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/html?' + URLEncodedJSONContents, Ss, [200,400]);
+                        HighlightLanguage := 'html'
+                     else
+                        HighlightLanguage := '';
+                     if (HighlightLanguage <> '') then
+                        HTTPClient.HTTPMethod('GET', HighlightServerURL + '/' + HighlightLanguage
+                           + kHighlighterOptions + '?' + URLEncodedJSONContents, Ss, [200,400]);
                      HighlighterOutput := Ss.Datastring;
                      Ss.Free;
                      if HTTPClient.ResponseStatusCode = 400 then
