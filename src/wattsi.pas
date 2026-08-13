@@ -2088,21 +2088,6 @@ begin
                Result.Append(Ord('\'));
                Result.Append(Ord('\'));
             end;
-         $0026:
-            begin
-               Result.Append(Ord('&'));
-               Result.Append(Ord('a'));
-               Result.Append(Ord('m'));
-               Result.Append(Ord('p'));
-               Result.Append(Ord(';'));
-            end;
-         $003C:
-            begin
-               Result.Append(Ord('&'));
-               Result.Append(Ord('l'));
-               Result.Append(Ord('t'));
-               Result.Append(Ord(';'));
-            end;
       else
          Result.Append(Enumerator.Current);
       end;
@@ -2117,7 +2102,7 @@ begin
    while (Enumerator.MoveNext()) do
 
       case (Enumerator.Current.Value) of
-         $000A, $0022, $005C, $0026, $003C:
+         $000A, $0022, $005C:
             begin
                Result := ForceEscapeForJSON(Value).AsString;
                Enumerator.Free();
