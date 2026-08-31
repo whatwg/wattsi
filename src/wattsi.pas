@@ -159,6 +159,7 @@ end;
 //                               empty cells may be left out entirely.
 //   cell     = [caveat] body
 //   caveat   = "*" partial | "^" needs a flag | "$" needs a prefix or alternative name
+//            | "@" mirrored from another browser, so the body is a state and not a version
 //   body     = "?" unknown | "-" unsupported | "!" supported, version unknown
 //            | "=" version           supported since exactly this version, no trailing "+"
 //            | version "-" version   supported over a range, rendered with an en dash
@@ -225,12 +226,52 @@ begin
    exit(VersionAdded + '-' + VersionRemoved);
 end;
 
-function EncodeBrowserData(const BrowserID: UTF8String; const VersionData: TJSON): UTF8String;
-var
-   NeedsFlag, NeedsPrefixOrAltName, IsPartial: Boolean;
-   VersionDetails: TJSON;
-   YesNoUnknown, VersionAdded, VersionRemoved: UTF8String;
+// Which browser BCD copies a "mirror"ed browser's support data from. Note that BCD's
+// "edge" is not in here: mdn-spec-links reports Chromium Edge separately as "edge_blink",
+// so a mirrored "edge" is handled as a special case below.
+function MDNMirrorSource(const BrowserID: UTF8String): UTF8String;
 begin
+   if (BrowserID = 'chrome_android') then Result := 'chrome'
+   else if (BrowserID = 'webview_android') then Result := 'chrome'
+   else if (BrowserID = 'samsunginternet_android') then Result := 'chrome_android'
+   else if (BrowserID = 'opera') then Result := 'chrome'
+   else if (BrowserID = 'opera_android') then Result := 'chrome_android'
+   else if (BrowserID = 'firefox_android') then Result := 'firefox'
+   else if (BrowserID = 'safari_ios') then Result := 'safari'
+   else Result := '';
+end;
+
+function EncodeBrowserData(const BrowserID: UTF8String; const MDNSupport: TJSONObject): UTF8String;
+const
+   kMaxMirrorDepth = 4; // longest real chain is opera_android -> chrome_android -> chrome
+var
+   NeedsFlag, NeedsPrefixOrAltName, IsPartial, IsMirrored: Boolean;
+   VersionData, VersionDetails: TJSON;
+   SourceID, YesNoUnknown, VersionAdded, VersionRemoved: UTF8String;
+   MirrorDepth: Cardinal;
+begin
+   // "mirror" means this browser's support is whatever the browser it derives from has, so
+   // follow the chain until there is real data. Without this, more than a third of all
+   // cells would say "unknown" when the data does in fact say something.
+   IsMirrored := False;
+   SourceID := BrowserID;
+   VersionData := MDNSupport[SourceID];
+   MirrorDepth := 0;
+   while ((VersionData = 'mirror') and (MirrorDepth < kMaxMirrorDepth)) do
+   begin
+      if (SourceID = 'edge') then
+         // Legacy Edge stopped at 18, and whatever Chromium Edge inherited from Chrome is
+         // reported as edge_blink, so this row is simply unsupported. Not "@-": nothing is
+         // being mirrored into the row the reader sees.
+         exit('-');
+      IsMirrored := True;
+      SourceID := MDNMirrorSource(SourceID);
+      if (SourceID = '') then
+         break;
+      VersionData := MDNSupport[SourceID];
+      Inc(MirrorDepth);
+   end;
+
    NeedsFlag := False;
    NeedsPrefixOrAltName := False;
    IsPartial := False;
@@ -293,6 +334,18 @@ begin
                NeedsPrefixOrAltName := True;
          end;
       end;
+   end;
+
+   // A mirrored row reports only whether the feature is supported. BCD maps a mirrored
+   // version through per-browser release tables, which mdn-spec-links does not give us, so
+   // any version number here would be the wrong browser's.
+   if (IsMirrored) then
+   begin
+      if (YesNoUnknown = 'unknown') then
+         exit('@?');
+      if (YesNoUnknown = 'no') then
+         exit('@-');
+      exit('@!');
    end;
 
    // At most one caveat is reported, most specific first.
@@ -454,8 +507,7 @@ begin
          begin
             if (BrowserIndex > Low(MDNBrowserSlots)) then
                Cells := Cells + ',';
-            Cells := Cells + EncodeBrowserData(MDNBrowserSlots[BrowserIndex],
-                                               MDNSupport[MDNBrowserSlots[BrowserIndex]]);
+            Cells := Cells + EncodeBrowserData(MDNBrowserSlots[BrowserIndex], MDNSupport);
          end;
 
       Feature := Squash(MDNSlug) + '|' + Level + '|' + Cells;
