@@ -60,22 +60,14 @@ type
    TAllVariants = (vHTML, vDEV, vSnap, vReview, vSplit);
    TVariants = vHTML..vReview;
    TStringMap = specialize THashTable <UTF8String, UTF8String, UTF8StringUtils>;
-   TMDNBrowsers = specialize TFPGMap <UTF8String, UTF8String>; // preserves order
 
 var
    HighlighterOutputByJSONContents: TStringMap;
    MDNJSONData: TJSON;
-   MDNBrowsers: TMDNBrowsers;
+   // How many engines "all current engines" means. The browser labels and the order rows
+   // are shown in now live in standard-mdn-annos.js; see the format notes below.
    MDNBrowsersProvidingCurrentEngines:
       array [0..2] of UTF8String = ('firefox', 'safari', 'chrome');
-   MDNBrowsersWithBorrowedEngines:
-      array [0..1] of UTF8String = ('opera', 'edge_blink');
-   MDNBrowsersWithRetiredEngines:
-      array [0..1] of UTF8String = ('edge', 'ie');
-   MDNBrowsersForMobileDevices:
-      array [0..5] of UTF8String = ('firefox_android', 'safari_ios',
-                                    'chrome_android', 'webview_android',
-                                    'samsunginternet_android', 'opera_android');
    CurrentVariant: TAllVariants;
 
 const
@@ -150,48 +142,49 @@ begin
    Result := True;
 end;
 
-procedure AddMDNBrowserRow(const SupportTable: TElement;
-                           const BrowserID: UTF8String;
-                           const YesNoUnknown: UTF8String;
-                           const Version: UTF8String;
-                           const IsPartial: Boolean;
-                           const NeedsFlag: Boolean;
-                           const NeedsPrefixOrAltName: Boolean;
-                           const Document: TDocument);
-type
-   AttributesArray = array of UTF8String;
-var
-   FlagSymbol, BrowserClass: UTF8String;
-   BrowserVersionAttributes: AttributesArray;
-   BrowserRow: TElement;
+// MDN annotation panels do not ship their body as markup. Each panel carries a compact
+// "data-mdn" attribute instead, and <https://resources.whatwg.org/standard-mdn-annos.js>
+// builds the support table from it the first time the reader opens the panel. That script
+// owns the browser labels, the engine-support strings and the render grouping; what is
+// shared between it and the code below is only this wire format:
+//
+//   data-mdn = "v1|" feature ("~" feature)*
+//   feature  = slug "|" level "|" cells ["|" caniuse-feature "," caniuse-title]
+//   level    = "" no remark | "0" no engines | "1" one engine | "9" all engines
+//            | "s"/"S" one/some engines under another name
+//            | "v"/"V" one/some engines prefixed
+//            | "p"/"P" one/some engines partially
+//   cells    = cell ("," cell)*  one per entry of MDNBrowserSlots, in that order. An
+//                               empty cell means "no row for this browser", and trailing
+//                               empty cells may be left out entirely.
+//   cell     = [caveat] body
+//   caveat   = "*" partial | "^" needs a flag | "$" needs a prefix or alternative name
+//   body     = "?" unknown | "-" unsupported | "!" supported, version unknown
+//            | "=" version           supported since exactly this version, no trailing "+"
+//            | version "-" version   supported over a range, rendered with an en dash
+//            | version               supported since this version, rendered with a "+"
+//
+// None of "|" and "~" occurs in any field of the current data, so no escaping is needed;
+// the two free-text fields are squashed defensively rather than escaped.
+//
+// New browsers must be APPENDED to MDNBrowserSlots and never inserted. Archived commit
+// snapshots keep loading the script above forever, and older copies of it simply ignore
+// the cells they do not know about, which only works while the order is append-only.
+// Anything that this scheme cannot express needs a new version prefix, not a redefinition
+// of "v1".
 
-begin
-   BrowserClass := BrowserID + ' ' + YesNoUnknown;
-   FlagSymbol := '';
-   BrowserVersionAttributes := Default(AttributesArray);
-   BrowserVersionAttributes := AttributesArray.Create('data-x', '');
-   if (IsPartial or NeedsFlag or NeedsPrefixOrAltName) then
-      FlagSymbol := UTF8String(#$F0#$9F#$94#$B0) + ' ';
-   if (NeedsPrefixOrAltName) then
-      BrowserVersionAttributes := AttributesArray
-        .Create('data-x', '', 'title', 'Requires a prefix or alternative name.');
-   if (NeedsFlag) then
-      BrowserVersionAttributes := AttributesArray
-        .Create('data-x', '', 'title', 'Requires setting a user preference or runtime flag.');
-   if (IsPartial) then
-      BrowserVersionAttributes := AttributesArray
-        .Create('data-x', '', 'title', 'Partial implementation.');
-   if (BrowserID = 'edge_blink') then
-      BrowserClass := 'edge_blink ' + YesNoUnknown
-   else
-   if (BrowserID = 'edge') then
-      BrowserClass := 'edge ' + YesNoUnknown;
-   BrowserRow := E(eSpan, ['data-x', '', 'class', BrowserClass], Document);
-   BrowserRow.AppendChild(E(eSpan, ['data-x', ''], [T(MDNBrowsers[BrowserID], Document)]));
-   BrowserRow.AppendChild(E(eSpan, BrowserVersionAttributes,
-                             [T(FlagSymbol + Version, Document)]));
-   SupportTable.AppendChild(BrowserRow);
-end;
+const
+   kMDNDataAttribute = 'data-mdn';
+   kMDNDataVersionPrefix = 'v1|';
+
+var
+   MDNBrowserSlots: array [0..12] of UTF8String = ('firefox', 'safari', 'chrome',
+                                                   'opera', 'edge_blink',
+                                                   'edge', 'ie',
+                                                   'firefox_android', 'safari_ios',
+                                                   'chrome_android', 'webview_android',
+                                                   'samsunginternet_android',
+                                                   'opera_android');
 
 function GetVersionAsString(const Version: TJSON): UTF8String;
 begin
@@ -200,51 +193,48 @@ begin
    exit(UTF8String(Version));
 end;
 
-function GetVersionOrRange(const BrowserID: UTF8String;
-                           const VersionAdded: UTF8String;
-                           const VersionRemoved: UTF8String;
-                           const YesNoUnknown: UTF8String): UTF8String;
+function EncodeVersionOrRange(const BrowserID: UTF8String;
+                              const VersionAdded: UTF8String;
+                              const VersionRemoved: UTF8String;
+                              const YesNoUnknown: UTF8String): UTF8String;
 begin
    if (YesNoUnknown = 'unknown') then
       exit('?');
    if (VersionAdded = 'False') then
-      exit('No');
+      exit('-');
    if ((VersionRemoved = '') or (VersionRemoved = 'False')) then
    begin
       if (YesNoUnknown = 'no') then
-         exit('No');
+         exit('-');
       if (VersionAdded = 'True') then
-         exit('Yes');
+         exit('!');
+      // These two shipped their final version, so there is no "+" to add.
       if ((BrowserID = 'edge') and (VersionAdded = '18')) then
-         exit('18');
+         exit('=18');
       if ((BrowserID = 'ie') and (VersionAdded = '11')) then
-         exit('11');
-      exit(VersionAdded + '+');
+         exit('=11');
+      exit(VersionAdded);
    end;
    // else VersionRemoved is either 'True' or an actual version number
    if (VersionAdded = '') then
       // can't show range if VersionAdded is empty
-      exit('No');
+      exit('-');
    if ((VersionRemoved = 'True') or (VersionAdded = 'True')) then
       // can't show range if VersionRemoved & VersionAdded aren't both numbers
-      exit('No');
-   exit(VersionAdded + UTF8Encode(#$2013) + VersionRemoved);
+      exit('-');
+   exit(VersionAdded + '-' + VersionRemoved);
 end;
 
-procedure ProcessBrowserData(const BrowserID: UTF8String;
-                             const VersionData: TJSON;
-                             const SupportTable: TElement;
-                             const Document: TDocument);
+function EncodeBrowserData(const BrowserID: UTF8String; const VersionData: TJSON): UTF8String;
 var
    NeedsFlag, NeedsPrefixOrAltName, IsPartial: Boolean;
    VersionDetails: TJSON;
-   YesNoUnknown, Version, VersionAdded, VersionRemoved: UTF8String;
+   YesNoUnknown, VersionAdded, VersionRemoved: UTF8String;
 begin
    NeedsFlag := False;
    NeedsPrefixOrAltName := False;
    IsPartial := False;
    YesNoUnknown := 'unknown';
-   Version := '?';
    VersionAdded := '';
    VersionRemoved := '';
 
@@ -304,214 +294,178 @@ begin
          end;
       end;
    end;
-   Version :=
-      GetVersionOrRange(BrowserID, VersionAdded, VersionRemoved, YesNoUnknown);
-   AddMDNBrowserRow(SupportTable, BrowserID, YesNoUnknown, Version, IsPartial,
-                    NeedsFlag, NeedsPrefixOrAltName, Document);
+
+   // At most one caveat is reported, most specific first.
+   if (IsPartial) then
+      Result := '*'
+   else
+   if (NeedsFlag) then
+      Result := '^'
+   else
+   if (NeedsPrefixOrAltName) then
+      Result := '$'
+   else
+      Result := '';
+   Result := Result +
+      EncodeVersionOrRange(BrowserID, VersionAdded, VersionRemoved, YesNoUnknown);
 end;
 
-procedure AddMDNBox(const MDNBox: TElement;
-                    const ID: UTF8String;
-                    const Document: TDocument;
-                          IsFirst: Boolean);
-var
-   MDNData, MDNSupport: TJSONObject;
-   MDNButton, MDNFeature, SupportTable, CanIUseRow: TElement;
-   MDNEngines: TJSONArray;
-   MDNFilename, MDNName, MDNSlug, MDNSubpath, MDNSummary, BrowserID: UTF8String;
-   FlagClassName, FlagSymbol, FlagTitle: UTF8String;
-   EnginesClassName, EnginesText: UTF8String;
-   EngineCount, i, j: Integer;
+// The always-visible part of a panel: the engine-support flag, if any, and the "MDN" chip.
+procedure AddMDNSummary(const MDNBox: TElement; const ID: UTF8String; const Document: TDocument);
 const
-   kMDNURLBase = 'https://developer.mozilla.org/en-US/docs/Web/';
-   kCanIUseURLBase = 'https://caniuse.com/#feat=';
-   kCanIUseText = 'caniuse.com table';
    kFlagClassLessThanTwo = 'less-than-two-engines-flag';
    kFlagClassAll = 'all-engines-flag';
-   kEnginesClassLessThanTwo = 'less-than-two-engines-text';
-   kEnginesClassAll = 'all-engines-text';
-   kInNone = 'No support in current engines.';
-   kInOne = 'Support in one engine only.';
-   kInAll = 'Support in all current engines.';
-   kAltNameInOne = 'Support in one engine under other name.';
-   kAltNameInSome = 'Support in some engines under other name.';
-   kPrefixInOne = 'Prefixed support in one engine.';
-   kPrefixInSome = 'Prefixed support in some engines.';
-   kPartialInOne = 'Partial support in one engine.';
-   kPartialInSome = 'Partial support in some engines.';
-
+   kFlagTitleLessThanTwo = 'This feature is in less than two current engines.';
+   kFlagTitleAll = 'This feature is in all current engines.';
+var
+   MDNData, MDNSupport: TJSONObject;
+   MDNSummary: TElement;
+   EngineCount: Integer;
+   FlagClassName, FlagSymbol, FlagTitle: UTF8String;
 begin
-   // Get the MDN details for this annotation.
+   MDNSummary := E(eSummary);
    for MDNData in TJSONArray(MDNJSONData[ID]) do
    begin
-      // MDNJSONData[ID] is an array of objects, where each object has data
-      // associated with a particular MDN article which links to the given ID in
-      // the HTML spec. We loop through those objects and assign each to an
-      // MDNData, which contains data for a particular spec feature: the set of
-      // engines with support for the feature, the browser-compat-data (BCD)
-      // filename which contains data for the feature, the feature name, the
-      // slug for the associated MDN article, the MDN article summary, the BCD
-      // browser-compat support data for the feature, and the MDN article title.
-      //
-      // Example showing the structure of the JSON data:
-      //
-      // "sharedworker": [                                <= HTML spec ID
-      //  {
-      //    "engines": [ "blink", "gecko" ],              <= supporting engines
-      //    "partial": [ "safari" ],                      <= partial support
-      //    "prefixed": [ "gecko", "safari" ],            <= prefixed support
-      //    "altname": [ "gecko" ],                       <= alternative name
-      //    "filename": "api/SharedWorker.json",          <= BCD filename
-      //    "name": "SharedWorker",                       <= BCD feature name
-      //    "slug":    "API/SharedWorker",                <= MDN article slug
-      //    "summary": "The SharedWorker interface ...",  <= MDN article summary
-      //    "support": {"chrome":{"version_added":"4"},.. <= MDN support data
-      //    "caniuse": {
-      //        "feature": "sharedworkers",               <= caniuse.com anchor
-      //        "title": "Shared Web Workers"             <= caniuse.com title
-      //    },
-      //    "title":   "SharedWorker"                     <= MDN article title
-      //  },
-      //  {
-      //    /* data from another MDN article associated with this spec ID */
-      //  }
-      // ],
-      //
-      // Note that, in the browser-support data, the value for a particular
-      // browser-ID key (e.g., "chrome") can optionally be an array of objects
-      // (instead of just a single object as shown in example above).
-      // See https://goo.gl/uejWa4 for documentation on the structure.
-      MDNSlug := MDNData['slug'];
-      MDNSummary := MDNData['summary'];
-      MDNSubpath := Copy(MDNSlug, Pos('/', MDNSlug) + 1);
+      // The flag describes the first MDN article associated with this ID; a panel that
+      // merges several IDs still only gets one.
       MDNSupport := MDNData['support'];
       if (MDNData['engines'] is TJSONArray) then
          EngineCount := MDNData['engines'].Length
       else
          EngineCount := -1;
-      if (IsFirst) then
+      FlagClassName := '';
+      // Exactly two engines gets no flag, and neither does missing data.
+      if ((EngineCount = 0) or (EngineCount = 1)) then
       begin
-         MDNButton := E(eButton, ['class', 'mdn-anno-btn',
-            'onclick', 'toggleStatus(this)']);
-         if (EngineCount = 0) then
-         begin
-            FlagClassName := kFlagClassLessThanTwo;
-            FlagSymbol := #$26A0;
-            FlagTitle := kInNone;
-            if (Assigned(MDNData['altname'])) then
-            begin
-               FlagTitle := kAltNameInOne;
-               if (MDNData['altname'].Length > 1) then
-                  FlagTitle := kAltNameInSome;
-            end
-            else
-            if (Assigned(MDNData['prefixed'])) then
-            begin
-               FlagTitle := kPrefixInOne;
-               if (MDNData['Prefixed'].Length > 1) then
-                  FlagTitle := kPrefixInSome;
-            end
-            else
-            if (Assigned(MDNData['partial'])) then
-            begin
-               FlagTitle := kPartialInOne;
-               if (MDNData['partial'].Length > 1) then
-                  FlagTitle := kPartialInSome;
-            end
-         end
-         else
-         if (EngineCount = 1) then
-         begin
-            FlagClassName := kFlagClassLessThanTwo;
-            FlagSymbol := #$26A0;
-            FlagTitle := kInOne;
-         end
-         else
-         if (EngineCount >= Length(MDNBrowsersProvidingCurrentEngines)) then
-         begin
-            FlagClassName := kFlagClassAll;
-            FlagSymbol := #$2714;
-            FlagTitle := kInAll;
-         end;
-         if ((EngineCount <> 2) and (MDNSupport <> nil)) then
-            MDNButton.AppendChild(E(eB, ['class', FlagClassName,
-                  'title', FlagTitle], Document, [T(FlagSymbol, Document)]));
-         MDNButton.AppendChild(E(eSpan, ['data-x', ''], [T('MDN')]));
-         MDNBox.AppendChild(MDNButton);
-      end;
-      IsFirst := False;
-      MDNFeature := E(eDiv, ['class', 'feature']);
-      MDNFeature.AppendChild(E(eP, [
-         E(eA, ['href', kMDNURLBase + MDNSlug, 'title', MDNSummary],
-            Document, [T(MDNSubpath, Document)])]));
-      MDNBox.AppendChild(MDNFeature);
-      if (EngineCount = 0) then
-      begin
-         EnginesClassName := kEnginesClassLessThanTwo;
-         EnginesText := kInNone;
-         if (Assigned(MDNData['altname'])) then
-         begin
-            EnginesText := kAltNameInOne;
-            if (MDNData['altname'].Length > 1) then
-               EnginesText := kAltNameInSome;
-         end
-         else
-         if (Assigned(MDNData['prefixed'])) then
-         begin
-            EnginesText := kPrefixInOne;
-            if (MDNData['prefixed'].Length > 1) then
-               EnginesText := kPrefixInSome;
-         end
-         else
-         if (Assigned(MDNData['partial'])) then
-         begin
-            EnginesText := kPartialInOne;
-            if (MDNData['partial'].Length > 1) then
-               EnginesText := kPartialInSome;
-         end
-      end
-      else
-      if (EngineCount = 1) then
-      begin
-         EnginesClassName := kEnginesClassLessThanTwo;
-         EnginesText := kInOne;
+         FlagClassName := kFlagClassLessThanTwo;
+         FlagSymbol := #$26A0;
+         FlagTitle := kFlagTitleLessThanTwo;
       end
       else
       if (EngineCount >= Length(MDNBrowsersProvidingCurrentEngines)) then
       begin
-         EnginesClassName := kEnginesClassAll;
-         EnginesText := kInAll;
+         FlagClassName := kFlagClassAll;
+         FlagSymbol := #$2714;
+         FlagTitle := kFlagTitleAll;
       end;
-      if (MDNSupport = nil) then continue;
-      if (EngineCount <> 2) then
-         MDNFeature.AppendChild(E(eP, ['class', EnginesClassName],
-            Document, [T(EnginesText, Document)]));
-      SupportTable := E(eDiv, ['class', 'support']);
-      MDNFeature.AppendChild(SupportTable);
-      for BrowserID in MDNBrowsersProvidingCurrentEngines do
-         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
-                            Document);
-      SupportTable.AppendChild(E(eHR));
-      for BrowserID in MDNBrowsersWithBorrowedEngines do
-         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
-                            Document);
-      SupportTable.AppendChild(E(eHR));
-      for BrowserID in MDNBrowsersWithRetiredEngines do
-         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
-                            Document);
-      SupportTable.AppendChild(E(eHR));
-      for BrowserID in MDNBrowsersForMobileDevices do
-         ProcessBrowserData(BrowserID, MDNSupport[BrowserID], SupportTable,
-                            Document);
-      if (Assigned(MDNData['caniuse'])) then
+      if ((FlagClassName <> '') and (MDNSupport <> nil)) then
+         MDNSummary.AppendChild(E(eB, ['class', FlagClassName, 'title', FlagTitle],
+                                  Document, [T(FlagSymbol, Document)]));
+      break;
+   end;
+   // data-x="" keeps the chip from being cross-referenced; it is stripped on output.
+   MDNSummary.AppendChild(E(eSpan, [kCrossRefAttribute, ''], [T('MDN')]));
+   MDNBox.AppendChild(MDNSummary);
+end;
+
+// The hidden part of a panel, as a "data-mdn" value without its version prefix. See the
+// format description above.
+function EncodeMDNAnnotations(const ID: UTF8String): UTF8String;
+
+   // "|" and "~" separate the encoding, and no field of the current data contains either.
+   // A tooltip is not worth an escaping scheme, so squash them if that ever changes.
+   function Squash(const Value: UTF8String): UTF8String;
+   begin
+      Result := StringReplace(StringReplace(Value, '|', ' ', [rfReplaceAll]),
+                              '~', ' ', [rfReplaceAll]);
+   end;
+
+var
+   MDNData, MDNSupport: TJSONObject;
+   MDNSlug, Level, Cells, Feature: UTF8String;
+   EngineCount, BrowserIndex: Integer;
+begin
+   // MDNJSONData[ID] is an array of objects, where each object has data associated with a
+   // particular MDN article which links to the given ID in the HTML spec. We loop through
+   // those objects and assign each to an MDNData, which contains data for a particular
+   // spec feature: the set of engines with support for the feature, the browser-compat-data
+   // (BCD) filename which contains data for the feature, the feature name, the slug for the
+   // associated MDN article, the MDN article summary, the BCD browser-compat support data
+   // for the feature, and the MDN article title.
+   //
+   // Example showing the structure of the JSON data:
+   //
+   // "sharedworker": [                                <= HTML spec ID
+   //  {
+   //    "engines": [ "blink", "gecko" ],              <= supporting engines
+   //    "partial": [ "safari" ],                      <= partial support
+   //    "prefixed": [ "gecko", "safari" ],            <= prefixed support
+   //    "altname": [ "gecko" ],                       <= alternative name
+   //    "filename": "api/SharedWorker.json",          <= BCD filename
+   //    "name": "SharedWorker",                       <= BCD feature name
+   //    "slug":    "API/SharedWorker",                <= MDN article slug
+   //    "summary": "The SharedWorker interface ...",  <= MDN article summary
+   //    "support": {"chrome":{"version_added":"4"},.. <= MDN support data
+   //    "caniuse": {
+   //        "feature": "sharedworkers",               <= caniuse.com anchor
+   //        "title": "Shared Web Workers"             <= caniuse.com title
+   //    },
+   //    "title":   "SharedWorker"                     <= MDN article title
+   //  },
+   //  {
+   //    /* data from another MDN article associated with this spec ID */
+   //  }
+   // ],
+   //
+   // Note that, in the browser-support data, the value for a particular browser-ID key
+   // (e.g., "chrome") can optionally be an array of objects (instead of just a single
+   // object as shown in example above). See https://goo.gl/uejWa4 for documentation on
+   // the structure. "summary" is deliberately not encoded: it was two thirds of the
+   // payload, and it was only ever a tooltip on the article link.
+   Result := '';
+   for MDNData in TJSONArray(MDNJSONData[ID]) do
+   begin
+      MDNSlug := MDNData['slug'];
+      MDNSupport := MDNData['support'];
+      if (MDNData['engines'] is TJSONArray) then
+         EngineCount := MDNData['engines'].Length
+      else
+         EngineCount := -1;
+
+      // Nothing is remarked upon when there is no support data at all, when there are
+      // exactly two engines, or when the engine count is missing.
+      Level := '';
+      if (MDNSupport <> nil) then
       begin
-         SupportTable.AppendChild(E(eHR));
-         CanIUseRow := E(eSpan, ['data-x', '', 'class', 'caniuse'], Document);
-         CanIUseRow.AppendChild(E(eSpan, ['data-x', ''],
-            [E(eA, ['href', kCanIUseURLBase + UTF8String(MDNData['caniuse']['feature']),
-               'title', MDNData['caniuse']['title']], Document, [T(kCanIUseText)])]));
-         SupportTable.AppendChild(CanIUseRow);
+         if (EngineCount = 0) then
+         begin
+            if (Assigned(MDNData['altname'])) then
+               Level := IfThen(MDNData['altname'].Length > 1, 'S', 's')
+            else
+            if (Assigned(MDNData['prefixed'])) then
+               Level := IfThen(MDNData['prefixed'].Length > 1, 'V', 'v')
+            else
+            if (Assigned(MDNData['partial'])) then
+               Level := IfThen(MDNData['partial'].Length > 1, 'P', 'p')
+            else
+               Level := '0';
+         end
+         else
+         if (EngineCount = 1) then
+            Level := '1'
+         else
+         if (EngineCount >= Length(MDNBrowsersProvidingCurrentEngines)) then
+            Level := '9';
       end;
+
+      Cells := '';
+      if (MDNSupport <> nil) then
+         for BrowserIndex := Low(MDNBrowserSlots) to High(MDNBrowserSlots) do
+         begin
+            if (BrowserIndex > Low(MDNBrowserSlots)) then
+               Cells := Cells + ',';
+            Cells := Cells + EncodeBrowserData(MDNBrowserSlots[BrowserIndex],
+                                               MDNSupport[MDNBrowserSlots[BrowserIndex]]);
+         end;
+
+      Feature := Squash(MDNSlug) + '|' + Level + '|' + Cells;
+      if (Assigned(MDNData['caniuse'])) then
+         Feature := Feature + '|' +
+            Squash(UTF8String(MDNData['caniuse']['feature'])) + ',' +
+            Squash(UTF8String(MDNData['caniuse']['title']));
+      if (Result <> '') then
+         Result := Result + '~';
+      Result := Result + Feature;
    end;
 end;
 
@@ -995,9 +949,10 @@ var
    procedure InsertMDNAnnotationForElement(const Element: TElement);
    var
       Candidate: TNode;
-      ID, ClassName: UTF8String;
+      ID, ClassName, MDNData: UTF8String;
       TargetAncestor, MDNBox: TElement;
       IsFirst: Boolean;
+      ScratchRope: Rope;
    begin
       if (not(Element.HasAttribute('id'))) then
          exit;
@@ -1006,7 +961,7 @@ var
          // No MDN article has a link to this ID.
          exit;
 
-      MDNBox := E(eDiv);
+      MDNBox := E(eDetails);
 
       if (Element.HasProperties(propHeading) or
          HasAncestorWithProperties(Element, propHeading)) then
@@ -1016,7 +971,7 @@ var
          // after the heading. When generating multipage output, inserting the
          // annotation after the heading ensures that it ends up in the right
          // file. It can otherwise incorrectly end up in the previous split.
-         ClassName := 'mdn-anno wrapped';
+         ClassName := 'mdn-anno';
          MDNBox.SetAttribute('class', ClassName);
          Candidate := Element;
          while not TElement(Candidate).HasProperties(propHeading) do
@@ -1044,7 +999,7 @@ var
          // index) or long <dl> list (e.g., the list of pseudo-classes), all the
          // annos for everything in that table or list end up being merged into
          // a single annotation way up at the beginning of the table or list.
-         ClassName := 'mdn-anno wrapped before';
+         ClassName := 'mdn-anno before';
          Candidate := Element;
          while not TElement(Candidate).IsIdentity(nsHTML, eTD) and
                not TElement(Candidate).IsIdentity(nsHTML, eDT) do
@@ -1065,7 +1020,7 @@ var
       end
       else
       begin
-         ClassName := 'mdn-anno wrapped before';
+         ClassName := 'mdn-anno before';
 
          // Find the furthest ancestor that is a direct child of <body>
          Candidate := Element;
@@ -1087,7 +1042,21 @@ var
       end;
 
       MDNBox.SetAttribute('class', ClassName);
-      AddMDNBox(MDNBox, ID, Document, IsFirst);
+      if (IsFirst) then
+         AddMDNSummary(MDNBox, ID, Document);
+      // A panel can be shared by several annotated IDs, so append rather than overwrite.
+      // The version prefix belongs to the panel, not to the individual features.
+      MDNData := MDNBox.GetAttribute(kMDNDataAttribute).AsString;
+      if (MDNData = '') then
+         MDNData := kMDNDataVersionPrefix
+      else
+         MDNData := MDNData + '~';
+      MDNData := MDNData + EncodeMDNAnnotations(ID);
+      // The rope points into MDNData, so the document has to keep that string alive.
+      StringStore.Push(MDNData);
+      ScratchRope := Default(Rope);
+      ScratchRope.Append(@MDNData[1], Length(MDNData)); // $R-
+      MDNBox.SetAttributeDestructively(kMDNDataAttribute, ScratchRope);
    end;
 
    function ProcessNode(var Node: TNode): Boolean; // return True if we are to keep this node, False if we drop it
@@ -2950,26 +2919,6 @@ begin
    end;
    Inform('Parsing MDN data...');
    MDNJSONData := ParseJSON(ReadTextFile(MDNJSONFilename));
-   MDNBrowsers := TMDNBrowsers.Create;
-   // The browser IDs here must match the ones in the imported JSON data.
-   // See the list of browser IDs at https://goo.gl/iDacWP.
-   MDNBrowsers['chrome'] := 'Chrome';
-   MDNBrowsers['chrome_android'] := 'Chrome Android';
-   MDNBrowsers['edge_blink'] := 'Edge';
-   MDNBrowsers['edge'] := 'Edge (Legacy)';
-   MDNBrowsers['firefox'] := 'Firefox';
-   MDNBrowsers['firefox_android'] := 'Firefox Android';
-   MDNBrowsers['ie'] := 'Internet Explorer';
-   // MDNBrowsers['nodejs'] := 'Node.js'; // no data for features in HTML
-   MDNBrowsers['opera'] := 'Opera';
-   MDNBrowsers['opera_android'] := 'Opera Android';
-   // MDNBrowsers['qq_android'] := 'QQ Browser'; // not enough data for features in HTML
-   MDNBrowsers['safari'] := 'Safari';
-   MDNBrowsers['safari_ios'] := 'Safari iOS';
-   MDNBrowsers['samsunginternet_android'] := 'Samsung Internet';
-   // MDNBrowsers['uc_android'] := 'UC Browser'; // not enough data for features in HTML
-   // MDNBrowsers['uc_chinese_android'] := 'Chinese UC Browser'; // not enough data for features in HTML
-   MDNBrowsers['webview_android'] := 'WebView Android';
    nsNone := Intern('');
    eList := Intern('list');
    eChapter := Intern('chapter');
