@@ -2171,6 +2171,140 @@ begin
    Result := Value.AsString;
 end;
 
+// Whitespace-only text nodes are about 9% of the nodes in the output, and most
+// of them are just the source's indentation sitting between block-level boxes,
+// where CSS white-space processing discards them anyway. The predicates below
+// find those, so that Save() can leave them out; whitespace that separates
+// inline-level content, or that lives in a white-space-preserving element, is
+// always kept. FirstPass() has already dropped the text children of elements
+// that cannot contain palpable text, so nothing below has to think about <ul>,
+// <ol>, <dl>, <table> and friends.
+//
+// This necessarily encodes assumptions about how the output is styled, i.e.
+// about <https://resources.whatwg.org/standard.css> and friends. IsBlockLevel()
+// and IsHeadNav() are the two places where those style sheets override the
+// default rendering in a way that makes otherwise-droppable whitespace matter.
+
+// True for elements that generate no box at all, and so neither separate nor
+// join the content on either side of them.
+function GeneratesNoBox(const Element: TElement): Boolean;
+begin
+   Result := Element.IsIdentity(nsHTML, eBase) or Element.IsIdentity(nsHTML, eLink) or
+             Element.IsIdentity(nsHTML, eMeta) or Element.IsIdentity(nsHTML, eScript) or
+             Element.IsIdentity(nsHTML, eStyle) or Element.IsIdentity(nsHTML, eTitle);
+end;
+
+// True for elements that generate a block-level box in the default rendering,
+// leaving out the white-space-preserving ones: whitespace inside those renders
+// as-is, and the developer's edition additionally makes them inline-level
+// ('code, pre { display: inline-block }'), which makes the whitespace around
+// them significant too. Whitespace inside one of these collapses, and one of
+// these next to the whitespace is a line box boundary. Unknown elements are
+// inline, so they are deliberately absent.
+function IsBlockLevel(const Element: TElement): Boolean;
+begin
+   Result := Element.HasSomeProperties(propTableSection or propTableCell or propHeading) or
+             Element.IsIdentity(nsHTML, eAddress) or Element.IsIdentity(nsHTML, eArticle) or
+             Element.IsIdentity(nsHTML, eAside) or
+             Element.IsIdentity(nsHTML, eBlockQuote) or Element.IsIdentity(nsHTML, eBody) or
+             Element.IsIdentity(nsHTML, eCaption) or Element.IsIdentity(nsHTML, eCenter) or
+             Element.IsIdentity(nsHTML, eCol) or Element.IsIdentity(nsHTML, eColGroup) or
+             Element.IsIdentity(nsHTML, eDD) or Element.IsIdentity(nsHTML, eDetails) or
+             Element.IsIdentity(nsHTML, eDialog) or Element.IsIdentity(nsHTML, eDir) or
+             Element.IsIdentity(nsHTML, eDiv) or Element.IsIdentity(nsHTML, eDL) or
+             Element.IsIdentity(nsHTML, eDT) or Element.IsIdentity(nsHTML, eFieldSet) or
+             Element.IsIdentity(nsHTML, eFigCaption) or Element.IsIdentity(nsHTML, eFigure) or
+             Element.IsIdentity(nsHTML, eFooter) or Element.IsIdentity(nsHTML, eForm) or
+             Element.IsIdentity(nsHTML, eHead) or Element.IsIdentity(nsHTML, eHeader) or
+             Element.IsIdentity(nsHTML, eHGroup) or Element.IsIdentity(nsHTML, eHR) or
+             Element.IsIdentity(nsHTML, eHTML) or Element.IsIdentity(nsHTML, eLegend) or
+             Element.IsIdentity(nsHTML, eLI) or Element.IsIdentity(nsHTML, eMain) or
+             Element.IsIdentity(nsHTML, eMenu) or
+             Element.IsIdentity(nsHTML, eNav) or Element.IsIdentity(nsHTML, eOL) or
+             Element.IsIdentity(nsHTML, eP) or
+             Element.IsIdentity(nsHTML, eSection) or
+             Element.IsIdentity(nsHTML, eSummary) or Element.IsIdentity(nsHTML, eTable) or
+             Element.IsIdentity(nsHTML, eUL);
+end;
+
+function IsAllWhitespace(constref Value: Rope): Boolean;
+var
+   Enumerator: RopeEnumerator;
+begin
+   Result := True;
+   Enumerator := RopeEnumerator.Create(@Value);
+   while (Enumerator.MoveNext()) do
+      case (Enumerator.Current.Value) of
+         $0009, $000A, $000C, $000D, $0020: ;
+      else
+         Result := False;
+         break;
+      end;
+   Enumerator.Free();
+end;
+
+// '#head nav > div' is 'display: inline-block', so the whitespace between those
+// <div>s is a word separator after all. Whitespace deeper inside the header
+// needs no such guard: between the <a>s inside those <div>s both neighbours are
+// inline, and at the start or the end of a <div> it is removed as usual.
+function IsHeadNav(const Element: TElement): Boolean;
+begin
+   Result := Element.IsIdentity(nsHTML, eNav) and (Element.ParentNode is TElement) and
+             (TElement(Element.ParentNode).GetAttribute('id').AsString = 'head');
+end;
+
+// The neighbour on one side of the candidate, skipping over siblings that
+// generate no box and so neither start a block nor contribute to a line. Runs of
+// whitespace-only text are skipped too: dropping elements in FirstPass leaves the
+// whitespace that surrounded them behind as separate text nodes, and the run as a
+// whole either renders or does not.
+function NearestRenderedSibling(const Node: TNode; const Forwards: Boolean): TNode;
+begin
+   Result := Node;
+   repeat
+      if (Forwards) then
+         Result := Result.NextSibling
+      else
+         Result := Result.PreviousSibling;
+   until (not Assigned(Result)) or
+         not ((Result is TComment) or
+              ((Result is TText) and IsAllWhitespace(TText(Result).Data)) or
+              ((Result is TElement) and GeneratesNoBox(TElement(Result))));
+end;
+
+// True if the node on one side of the candidate is part of the same line box,
+// rather than a block boundary. A missing sibling is the edge of the block
+// container, which is a boundary too.
+function ContinuesLine(const Node: TNode): Boolean;
+begin
+   Result := Assigned(Node) and not ((Node is TElement) and IsBlockLevel(TElement(Node)));
+end;
+
+function IsDroppableWhitespace(const Node: TText): Boolean;
+var
+   Parent: TElement;
+   Previous, Next: TNode;
+begin
+   Result := False;
+   if (not (Node.ParentNode is TElement)) then
+      exit;
+   Parent := TElement(Node.ParentNode);
+   if (not IsBlockLevel(Parent)) then
+      exit;
+   if (not IsAllWhitespace(Node.Data)) then
+      exit;
+   if (IsHeadNav(Parent)) then
+      exit;
+   Previous := NearestRenderedSibling(Node, False);
+   Next := NearestRenderedSibling(Node, True);
+   // A block boundary on either side puts the whitespace at the start or the end
+   // of a line box, where CSS white-space processing removes it. Whitespace
+   // between two inline-level boxes is a word separator, so it has to stay.
+   if (ContinuesLine(Previous) and ContinuesLine(Next)) then
+      exit;
+   Result := True;
+end;
+
 procedure Save(const Document: TDocument; const FileName: AnsiString; const InSplit: Boolean = False);
 var
    F: Text;
@@ -2545,6 +2679,12 @@ begin
       if (Current is TText) then
       begin
          Assert(Assigned(CurrentElement));
+         if ((not CurrentlyInHighlightedElement) and IsDroppableWhitespace(TText(Current))) then
+         begin
+            if (not WalkToNext(Current, Document, @WalkOut)) then
+               break;
+            continue;
+         end;
          WriteJSONIfInHighlightedElement(',"');
          if (CurrentElement.HasProperties(propRawTextElement)) then
          begin
