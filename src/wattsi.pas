@@ -2271,6 +2271,14 @@ begin
               ((Result is TElement) and GeneratesNoBox(TElement(Result))));
 end;
 
+// True if the node on one side of the candidate is part of the same line box,
+// rather than a block boundary. A missing sibling is the edge of the block
+// container, which is a boundary too.
+function ContinuesLine(const Node: TNode): Boolean;
+begin
+   Result := Assigned(Node) and not ((Node is TElement) and IsBlockLevel(TElement(Node)));
+end;
+
 function IsDroppableWhitespace(const Node: TText): Boolean;
 var
    Parent: TElement;
@@ -2288,13 +2296,10 @@ begin
       exit;
    Previous := NearestRenderedSibling(Node, False);
    Next := NearestRenderedSibling(Node, True);
-   // Whitespace at the very start or the very end of a block container is removed
-   // by CSS white-space processing, and whitespace between two block-level boxes
-   // is not in an inline formatting context to begin with. Anything else is a
-   // word separator between inline-level content, so it has to stay.
-   if (Assigned(Previous) and Assigned(Next) and
-       not ((Previous is TElement) and IsBlockLevel(TElement(Previous)) and
-            (Next is TElement) and IsBlockLevel(TElement(Next)))) then
+   // A block boundary on either side puts the whitespace at the start or the end
+   // of a line box, where CSS white-space processing removes it. Whitespace
+   // between two inline-level boxes is a word separator, so it has to stay.
+   if (ContinuesLine(Previous) and ContinuesLine(Next)) then
       exit;
    Result := True;
 end;
