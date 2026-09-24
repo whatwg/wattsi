@@ -149,10 +149,13 @@ end;
 // shared between it and the code below is only this wire format:
 //
 //   data-mdn = "v1|" feature ("~" feature)*
-//   feature  = article "|" level "|" cells ["|" caniuse-feature "," caniuse-title]
+//   feature  = article "|" level "|" cells ["|" caniuse ["|" label]]
 //   article  = the MDN article's URL relative to <https://developer.mozilla.org/en-US/docs/>,
 //              e.g. "Web/HTML/Element/video" or "Glossary/Serializable_object", or an
 //              absolute URL if it isn't under that base
+//   caniuse  = "" | caniuse-feature "," caniuse-title
+//   label    = which BCD feature(s) the record is for, e.g. "<textarea>", given only when
+//              another record in the panel has the same article
 //   level    = "" no remark | "0" no engines | "1" one engine | "9" all engines
 //            | "s"/"S" one/some engines under another name
 //            | "v"/"V" one/some engines prefixed
@@ -403,10 +406,32 @@ procedure AppendMDNAnnotations(var Payload: UTF8String; const ID: UTF8String);
       Result := Pos('~' + Feature + '~', '~' + Payload + '~') > 0;
    end;
 
+   // What to call a BCD feature when several share one MDN article: its element for
+   // html/elements/*, otherwise its file's own name, e.g. the interface for api/*.
+   function FeatureLabel(const Filename: UTF8String): UTF8String;
+   begin
+      Result := ChangeFileExt(ExtractFileName(Filename), '');
+      if (Copy(Filename, 1, Length('html/elements/')) = 'html/elements/') then
+         Result := '<' + Result + '>';
+   end;
+
+   procedure AddToList(var List: UTF8String; const Item: UTF8String);
+   begin
+      if ((Item = '') or (Pos(', ' + Item + ', ', ', ' + List + ', ') > 0)) then
+         exit;
+      if (List <> '') then
+         List := List + ', ';
+      List := List + Item;
+   end;
+
 var
    MDNData, MDNSupport: TJSONObject;
-   Level, Cells, Feature: UTF8String;
-   EngineCount, BrowserIndex: Integer;
+   Level, Cells, Feature, Article, RecordLabel: UTF8String;
+   EngineCount, BrowserIndex, Index, Other, Third: Integer;
+   // One entry per distinct record for this ID, in the order they first appear.
+   Records, Articles, Labels, Names: array of UTF8String;
+   HasCanIUse, FromBCD: array of Boolean;
+   UseNames: Boolean;
 begin
    // MDNJSONData[ID] is an array of objects, where each object has data associated with a
    // particular MDN article which links to the given ID in the HTML spec. We loop through
@@ -489,11 +514,74 @@ begin
                                                MDNSupport[MDNBrowserSlots[BrowserIndex]]);
          end;
 
-      Feature := Squash(ArticlePath(MDNData)) + '|' + Level + '|' + Cells;
+      Article := Squash(ArticlePath(MDNData));
+      Feature := Article + '|' + Level + '|' + Cells;
       if (Assigned(MDNData['caniuse'])) then
          Feature := Feature + '|' +
             Squash(UTF8String(MDNData['caniuse']['feature'])) + ',' +
             Squash(UTF8String(MDNData['caniuse']['title']));
+
+      // Merge features that encode identically, but keep what each one is called, so a
+      // record shared by several features can be labelled with all of them.
+      Index := High(Records);
+      while ((Index >= 0) and (Records[Index] <> Feature)) do
+         Dec(Index);
+      if (Index < 0) then
+      begin
+         Index := Length(Records);
+         SetLength(Records, Index + 1);
+         SetLength(Articles, Index + 1);
+         SetLength(Labels, Index + 1);
+         SetLength(Names, Index + 1);
+         SetLength(HasCanIUse, Index + 1);
+         SetLength(FromBCD, Index + 1);
+         Records[Index] := Feature;
+         Articles[Index] := Article;
+         Labels[Index] := '';
+         Names[Index] := '';
+         HasCanIUse[Index] := Assigned(MDNData['caniuse']);
+         FromBCD[Index] := False;
+      end;
+      // Entries without a "filename" aren't from BCD itself (see w3c/mdn-spec-links#854),
+      // so there is nothing to label them with.
+      if (Assigned(MDNData['filename'])) then
+      begin
+         FromBCD[Index] := True;
+         AddToList(Labels[Index], Squash(FeatureLabel(MDNData['filename'])));
+         if (Assigned(MDNData['name'])) then
+            AddToList(Names[Index], Squash(UTF8String(MDNData['name'])));
+      end;
+   end;
+
+   for Index := 0 to High(Records) do
+   begin
+      // A record only needs a label when another BCD feature here has the same article
+      // with different support, e.g. "disabled" on <button>, <input> and so on. If the
+      // element or file name doesn't tell that group apart, use the BCD feature names.
+      RecordLabel := '';
+      if (FromBCD[Index]) then
+      begin
+         UseNames := False;
+         for Other := 0 to High(Records) do
+            if ((Other <> Index) and FromBCD[Other] and (Articles[Other] = Articles[Index])) then
+            begin
+               RecordLabel := Labels[Index];
+               for Third := 0 to High(Records) do
+                  if ((Third <> Other) and FromBCD[Third] and
+                      (Articles[Third] = Articles[Index]) and (Labels[Third] = Labels[Other])) then
+                     UseNames := True;
+            end;
+         if (UseNames) then
+            RecordLabel := Names[Index];
+      end;
+
+      Feature := Records[Index];
+      if (RecordLabel <> '') then
+      begin
+         if (not HasCanIUse[Index]) then
+            Feature := Feature + '|';
+         Feature := Feature + '|' + RecordLabel;
+      end;
       if (AlreadyPresent(Feature)) then
          continue;
       if (Payload <> '') then
