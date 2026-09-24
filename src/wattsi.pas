@@ -149,7 +149,10 @@ end;
 // shared between it and the code below is only this wire format:
 //
 //   data-mdn = "v1|" feature ("~" feature)*
-//   feature  = slug "|" level "|" cells ["|" caniuse-feature "," caniuse-title]
+//   feature  = article "|" level "|" cells ["|" caniuse-feature "," caniuse-title]
+//   article  = the MDN article's URL relative to <https://developer.mozilla.org/en-US/docs/>,
+//              e.g. "Web/HTML/Element/video" or "Glossary/Serializable_object", or an
+//              absolute URL if it isn't under that base
 //   level    = "" no remark | "0" no engines | "1" one engine | "9" all engines
 //            | "s"/"S" one/some engines under another name
 //            | "v"/"V" one/some engines prefixed
@@ -370,9 +373,26 @@ function EncodeMDNAnnotations(const ID: UTF8String): UTF8String;
                               '~', ' ', [rfReplaceAll]);
    end;
 
+   // "slug" is only the article's path below /docs/Web/, and not every article is under
+   // there: a few are /docs/Learn/ or /docs/Glossary/ pages, and a few have the whole URL
+   // as their slug. "mdn_url" is right in all of those cases, so use it.
+   function ArticlePath(const MDNData: TJSONObject): UTF8String;
+   const
+      kMDNDocsBase = 'https://developer.mozilla.org/en-US/docs/';
+   begin
+      if (not Assigned(MDNData['mdn_url'])) then
+      begin
+         Result := 'Web/' + UTF8String(MDNData['slug']);
+         exit;
+      end;
+      Result := MDNData['mdn_url'];
+      if (Copy(Result, 1, Length(kMDNDocsBase)) = kMDNDocsBase) then
+         Delete(Result, 1, Length(kMDNDocsBase));
+   end;
+
 var
    MDNData, MDNSupport: TJSONObject;
-   MDNSlug, Level, Cells, Feature: UTF8String;
+   Level, Cells, Feature: UTF8String;
    EngineCount, BrowserIndex: Integer;
 begin
    // MDNJSONData[ID] is an array of objects, where each object has data associated with a
@@ -415,7 +435,6 @@ begin
    Result := '';
    for MDNData in TJSONArray(MDNJSONData[ID]) do
    begin
-      MDNSlug := MDNData['slug'];
       MDNSupport := MDNData['support'];
       if (MDNData['engines'] is TJSONArray) then
          EngineCount := MDNData['engines'].Length
@@ -458,7 +477,7 @@ begin
                                                MDNSupport[MDNBrowserSlots[BrowserIndex]]);
          end;
 
-      Feature := Squash(MDNSlug) + '|' + Level + '|' + Cells;
+      Feature := Squash(ArticlePath(MDNData)) + '|' + Level + '|' + Cells;
       if (Assigned(MDNData['caniuse'])) then
          Feature := Feature + '|' +
             Squash(UTF8String(MDNData['caniuse']['feature'])) + ',' +
