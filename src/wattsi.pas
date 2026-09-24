@@ -430,8 +430,8 @@ var
    EngineCount, BrowserIndex, Index, Other, Third: Integer;
    // One entry per distinct record for this ID, in the order they first appear.
    Records, Articles, Labels, Names: array of UTF8String;
-   HasCanIUse, FromBCD: array of Boolean;
-   UseNames: Boolean;
+   HasCanIUse, FromBCD, NotFromBCD: array of Boolean;
+   UseNames, Shadowed: Boolean;
 begin
    // MDNJSONData[ID] is an array of objects, where each object has data associated with a
    // particular MDN article which links to the given ID in the HTML spec. We loop through
@@ -535,12 +535,14 @@ begin
          SetLength(Names, Index + 1);
          SetLength(HasCanIUse, Index + 1);
          SetLength(FromBCD, Index + 1);
+         SetLength(NotFromBCD, Index + 1);
          Records[Index] := Feature;
          Articles[Index] := Article;
          Labels[Index] := '';
          Names[Index] := '';
          HasCanIUse[Index] := Assigned(MDNData['caniuse']);
          FromBCD[Index] := False;
+         NotFromBCD[Index] := False;
       end;
       // Entries without a "filename" aren't from BCD itself (see w3c/mdn-spec-links#854),
       // so there is nothing to label them with.
@@ -550,11 +552,29 @@ begin
          AddToList(Labels[Index], Squash(FeatureLabel(MDNData['filename'])));
          if (Assigned(MDNData['name'])) then
             AddToList(Names[Index], Squash(UTF8String(MDNData['name'])));
-      end;
+      end
+      else
+         NotFromBCD[Index] := True;
    end;
 
    for Index := 0 to High(Records) do
    begin
+      // mdn-spec-links adds entries of its own for what BCD lacks, and they go stale once BCD
+      // covers the same feature, showing up as a second table that nothing explains (some
+      // claim no engines where BCD says three). Say so rather than guess which to drop, and
+      // only once per build rather than once per variant.
+      if (NotFromBCD[Index] and (CurrentVariant = vHTML)) then
+      begin
+         Shadowed := FromBCD[Index];
+         for Other := 0 to High(Records) do
+            if ((Other <> Index) and FromBCD[Other] and (Articles[Other] = Articles[Index])) then
+               Shadowed := True;
+         if (Shadowed) then
+            Writeln('Warning: MDN data for #', ID, ' has an entry for ', Articles[Index],
+                    ' that isn''t from BCD, as well as one that is. The former is probably ',
+                    'stale in w3c/mdn-spec-links'' .local/html.json.');
+      end;
+
       // A record only needs a label when another BCD feature here has the same article
       // with different support, e.g. "disabled" on <button>, <input> and so on. If the
       // element or file name doesn't tell that group apart, use the BCD feature names.
