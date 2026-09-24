@@ -361,9 +361,10 @@ begin
    MDNBox.AppendChild(MDNSummary);
 end;
 
-// The hidden part of a panel, as a "data-mdn" value without its version prefix. See the
-// format description above.
-function EncodeMDNAnnotations(const ID: UTF8String): UTF8String;
+// Appends this ID's feature records to a panel's "data-mdn" payload, which carries the
+// records without the version prefix. See the format description above. A panel can serve
+// several IDs, so Payload may already hold records from an earlier one.
+procedure AppendMDNAnnotations(var Payload: UTF8String; const ID: UTF8String);
 
    // "|" and "~" separate the encoding, and no field of the current data contains either.
    // A tooltip is not worth an escaping scheme, so squash them if that ever changes.
@@ -388,6 +389,16 @@ function EncodeMDNAnnotations(const ID: UTF8String): UTF8String;
       Result := MDNData['mdn_url'];
       if (Copy(Result, 1, Length(kMDNDocsBase)) = kMDNDocsBase) then
          Delete(Result, 1, Length(kMDNDocsBase));
+   end;
+
+   // Two BCD entries can encode to exactly the same record: h1 through h6 are six features
+   // sharing one MDN page and one support table, and serializable-objects is seven. What
+   // told them apart upstream was "name" and "filename", neither of which is encoded, so
+   // emitting both would only render the same table twice. Records are Squash()ed and so
+   // cannot contain "~", which makes this substring test exact.
+   function AlreadyPresent(const Feature: UTF8String): Boolean;
+   begin
+      Result := Pos('~' + Feature + '~', '~' + Payload + '~') > 0;
    end;
 
 var
@@ -432,7 +443,6 @@ begin
    // object as shown in example above). See https://goo.gl/uejWa4 for documentation on
    // the structure. "summary" is deliberately not encoded: it was two thirds of the
    // payload, and it was only ever a tooltip on the article link.
-   Result := '';
    for MDNData in TJSONArray(MDNJSONData[ID]) do
    begin
       MDNSupport := MDNData['support'];
@@ -482,9 +492,11 @@ begin
          Feature := Feature + '|' +
             Squash(UTF8String(MDNData['caniuse']['feature'])) + ',' +
             Squash(UTF8String(MDNData['caniuse']['title']));
-      if (Result <> '') then
-         Result := Result + '~';
-      Result := Result + Feature;
+      if (AlreadyPresent(Feature)) then
+         continue;
+      if (Payload <> '') then
+         Payload := Payload + '~';
+      Payload := Payload + Feature;
    end;
 end;
 
@@ -1064,13 +1076,14 @@ var
       if (IsFirst) then
          AddMDNSummary(MDNBox, ID, Document);
       // A panel can be shared by several annotated IDs, so append rather than overwrite.
-      // The version prefix belongs to the panel, not to the individual features.
+      // The version prefix belongs to the panel, not to the individual features, and is
+      // kept off while appending so that every record is delimited the same way and a
+      // duplicate of one contributed by an earlier ID can be recognised.
       MDNData := MDNBox.GetAttribute(kMDNDataAttribute).AsString;
-      if (MDNData = '') then
-         MDNData := kMDNDataVersionPrefix
-      else
-         MDNData := MDNData + '~';
-      MDNData := MDNData + EncodeMDNAnnotations(ID);
+      if (MDNData <> '') then
+         Delete(MDNData, 1, Length(kMDNDataVersionPrefix));
+      AppendMDNAnnotations(MDNData, ID);
+      MDNData := kMDNDataVersionPrefix + MDNData;
       // The rope points into MDNData, so the document has to keep that string alive.
       StringStore.Push(MDNData);
       ScratchRope := Default(Rope);
