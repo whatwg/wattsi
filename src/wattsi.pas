@@ -424,14 +424,28 @@ procedure AppendMDNAnnotations(var Payload: UTF8String; const ID: UTF8String);
       List := List + Item;
    end;
 
+   // Whether Candidates differ between every two BCD records that have Article.
+   function TellsApart(const Candidates, RecordArticles: array of UTF8String;
+                       const RecordFromBCD: array of Boolean; const Article: UTF8String): Boolean;
+   var
+      A, B: Integer;
+   begin
+      for A := 0 to High(Candidates) do
+         for B := A + 1 to High(Candidates) do
+            if (RecordFromBCD[A] and RecordFromBCD[B] and (RecordArticles[A] = Article) and
+                (RecordArticles[B] = Article) and (Candidates[A] = Candidates[B])) then
+               exit(False);
+      Result := True;
+   end;
+
 var
    MDNData, MDNSupport: TJSONObject;
-   Level, Cells, Feature, Article, RecordLabel: UTF8String;
-   EngineCount, BrowserIndex, Index, Other, Third: Integer;
+   Level, Cells, Feature, Article, RecordLabel, Filename: UTF8String;
+   EngineCount, BrowserIndex, Index, Other: Integer;
    // One entry per distinct record for this ID, in the order they first appear.
-   Records, Articles, Labels, Names: array of UTF8String;
+   Records, Articles, Labels, Paths, Names: array of UTF8String;
    HasCanIUse, FromBCD, NotFromBCD: array of Boolean;
-   UseNames, Shadowed: Boolean;
+   Shared, Shadowed: Boolean;
 begin
    // MDNJSONData[ID] is an array of objects, where each object has data associated with a
    // particular MDN article which links to the given ID in the HTML spec. We loop through
@@ -532,6 +546,7 @@ begin
          SetLength(Records, Index + 1);
          SetLength(Articles, Index + 1);
          SetLength(Labels, Index + 1);
+         SetLength(Paths, Index + 1);
          SetLength(Names, Index + 1);
          SetLength(HasCanIUse, Index + 1);
          SetLength(FromBCD, Index + 1);
@@ -539,6 +554,7 @@ begin
          Records[Index] := Feature;
          Articles[Index] := Article;
          Labels[Index] := '';
+         Paths[Index] := '';
          Names[Index] := '';
          HasCanIUse[Index] := Assigned(MDNData['caniuse']);
          FromBCD[Index] := False;
@@ -549,7 +565,11 @@ begin
       if (Assigned(MDNData['filename'])) then
       begin
          FromBCD[Index] := True;
-         AddToList(Labels[Index], Squash(FeatureLabel(MDNData['filename'])));
+         Filename := MDNData['filename'];
+         AddToList(Labels[Index], Squash(FeatureLabel(Filename)));
+         // e.g. "at-rules/namespace" rather than "selectors/namespace"
+         AddToList(Paths[Index],
+                   Squash(ChangeFileExt(Copy(Filename, Pos('/', Filename) + 1, MaxInt), '')));
          if (Assigned(MDNData['name'])) then
             AddToList(Names[Index], Squash(UTF8String(MDNData['name'])));
       end
@@ -576,22 +596,24 @@ begin
       end;
 
       // A record only needs a label when another BCD feature here has the same article
-      // with different support, e.g. "disabled" on <button>, <input> and so on. If the
-      // element or file name doesn't tell that group apart, use the BCD feature names.
+      // with different support, e.g. "disabled" on <button>, <input> and so on. Name the
+      // features the first way that tells them all apart: by element or file, then by file
+      // path, then by BCD feature name. If none does, a label wouldn't help.
       RecordLabel := '';
+      Shared := False;
       if (FromBCD[Index]) then
-      begin
-         UseNames := False;
          for Other := 0 to High(Records) do
             if ((Other <> Index) and FromBCD[Other] and (Articles[Other] = Articles[Index])) then
-            begin
-               RecordLabel := Labels[Index];
-               for Third := 0 to High(Records) do
-                  if ((Third <> Other) and FromBCD[Third] and
-                      (Articles[Third] = Articles[Index]) and (Labels[Third] = Labels[Other])) then
-                     UseNames := True;
-            end;
-         if (UseNames) then
+               Shared := True;
+      if (Shared) then
+      begin
+         if (TellsApart(Labels, Articles, FromBCD, Articles[Index])) then
+            RecordLabel := Labels[Index]
+         else
+         if (TellsApart(Paths, Articles, FromBCD, Articles[Index])) then
+            RecordLabel := Paths[Index]
+         else
+         if (TellsApart(Names, Articles, FromBCD, Articles[Index])) then
             RecordLabel := Names[Index];
       end;
 
