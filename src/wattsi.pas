@@ -298,15 +298,17 @@ begin
       end;
    end;
 
-   // At most one caveat is reported, most specific first.
-   if (IsPartial) then
-      Result := '*'
-   else
+   // Only one caveat fits, so report the one that limits use most: behind a flag it hasn't
+   // shipped, under a prefix or other name it has but needs different code, and partial
+   // support works under the standard name with gaps.
    if (NeedsFlag) then
       Result := '^'
    else
    if (NeedsPrefixOrAltName) then
       Result := '$'
+   else
+   if (IsPartial) then
+      Result := '*'
    else
       Result := '';
    Result := Result +
